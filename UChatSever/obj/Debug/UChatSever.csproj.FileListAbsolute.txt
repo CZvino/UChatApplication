@@ -1,0 +1,2 @@
+c:\users\lenovo\documents\visual studio 2015\Projects\UChatApplication\UChatSever\bin\Debug\UChatSever.exe.config
+c:\users\lenovo\documents\visual studio 2015\Projects\UChatApplication\UChatSever\bin\Debug\UChatServer.exe.config

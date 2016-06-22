@@ -1,0 +1,6 @@
+c:\users\lenovo\documents\visual studio 2015\Projects\UChatApplication\UChatSever\bin\Debug\UChatServer.exe.config
+c:\users\lenovo\documents\visual studio 2015\Projects\UChatApplication\UChatSever\bin\Debug\UChatServer.exe
+c:\users\lenovo\documents\visual studio 2015\Projects\UChatApplication\UChatSever\bin\Debug\UChatServer.pdb
+c:\users\lenovo\documents\visual studio 2015\Projects\UChatApplication\UChatSever\obj\Debug\UChatServer.csprojResolveAssemblyReference.cache
+c:\users\lenovo\documents\visual studio 2015\Projects\UChatApplication\UChatSever\obj\Debug\UChatServer.exe
+c:\users\lenovo\documents\visual studio 2015\Projects\UChatApplication\UChatSever\obj\Debug\UChatServer.pdb

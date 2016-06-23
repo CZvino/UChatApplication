@@ -1,0 +1,8 @@
+C:\Users\lenovo\documents\visual studio 2015\Projects\UChatApplication\UChatClientConsole\bin\Debug\UChatClientConsole.exe.config
+C:\Users\lenovo\documents\visual studio 2015\Projects\UChatApplication\UChatClientConsole\bin\Debug\UChatClientConsole.exe
+C:\Users\lenovo\documents\visual studio 2015\Projects\UChatApplication\UChatClientConsole\bin\Debug\UChatClientConsole.pdb
+C:\Users\lenovo\documents\visual studio 2015\Projects\UChatApplication\UChatClientConsole\bin\Debug\Newtonsoft.Json.dll
+C:\Users\lenovo\documents\visual studio 2015\Projects\UChatApplication\UChatClientConsole\bin\Debug\Newtonsoft.Json.xml
+C:\Users\lenovo\documents\visual studio 2015\Projects\UChatApplication\UChatClientConsole\obj\Debug\UChatClientConsole.exe
+C:\Users\lenovo\documents\visual studio 2015\Projects\UChatApplication\UChatClientConsole\obj\Debug\UChatClientConsole.pdb
+C:\Users\lenovo\documents\visual studio 2015\Projects\UChatApplication\UChatClientConsole\obj\Debug\UChatClientConsole.csprojResolveAssemblyReference.cache

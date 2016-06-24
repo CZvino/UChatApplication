@@ -44,22 +44,50 @@ namespace UChatServer
             com = new SqlCommand();
             com.Connection = con;
             com.CommandType = CommandType.Text;
-            com.CommandText = "select id, code, name, gender, age from UserInfo wherr id = '" + userId + "'";
+            com.CommandText = "select id, code, name, gender, age from UserInfo where id = '" + userId + "'";
 
             // 获得查询结果
             SqlDataReader ans = com.ExecuteReader();
-
 
             if (ans.Read())
             {
                 if (Convert.ToString(ans[1]).Trim().Equals(userPassword))
                 {
-                    userData = new UserData((string)ans[0], (string)ans[2], (string)ans[3], (string)ans[4]);                   
+                    userData = new UserData((string)ans[0], (string)ans[2], (string)ans[3], (int)ans[4]);                   
                     return true;
                 }
                 else
                     return false;
             }
+            return false;
+        }
+        #endregion
+
+        #region ----------    用户注册    ----------
+        /// <summary>
+        ///     用户注册
+        /// </summary>
+        /// <param name="userId">UChat账号</param>
+        /// <param name="userName">用户昵称</param>
+        /// <param name="userPassword">用户密码</param>
+        /// <param name="userGender">性别</param>
+        /// <param name="userAge">年龄</param>
+        /// <returns></returns>
+        public bool Register(string userId, string userName, string userPassword, string userGender, int userAge)
+        {
+            if (userGender == null || userGender == "")
+                userGender = "男";
+
+            // 初始化查询语句
+            com = new SqlCommand();
+            com.Connection = con;
+            com.CommandType = CommandType.Text;
+            com.CommandText = "insert into UserInfo(id, name, code, gender, age) values ('" + userId + "', '" + userName + "', '" + userPassword + "', '" + userGender + "', '" + userAge +"')";
+
+            com.ExecuteNonQuery();
+
+            Console.WriteLine("新用户\"{0}:{1}:{2}:{3}:{4}\"注册成功", userId, userName, userPassword, userGender, userAge);
+
             return false;
         }
         #endregion
@@ -85,7 +113,7 @@ namespace UChatServer
 
             // 保存信息
             if (ans.Read())
-                userData = new UserData((string)ans[0], (string)ans[1], (string)ans[2], (string)ans[3]);
+                userData = new UserData((string)ans[0], (string)ans[1], (string)ans[2], (int)ans[3]);
 
             return JsonConvert.SerializeObject(userData);
         }

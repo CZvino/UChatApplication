@@ -16,8 +16,10 @@ namespace UChatClientConsole
         // 登录/注册 相关
         private const byte LOGIN = 0;
         private const byte REGISTER = 1;
-        private const byte IS_LOGIN_OR_REGISTER = 2;
-        private const byte IS_NOT_LOGIN_OR_REGISTER = 3;
+        private const byte IS_LOGIN = 2;
+        private const byte IS_NOT_LOGIN = 3;
+        private const byte IS_REGISTER = 4;
+        private const byte IS_NOT_REGISTER = 5;
 
         // 用户发送给单个用户 相关
         private const byte INDIVIDUAL_LOWER_BOUND = 10;
@@ -52,8 +54,8 @@ namespace UChatClientConsole
         // 用于保存在线的好友列表
         private List<string> friendList;
 
-        private string userName;
-        private string toName;
+        private string userId;
+        private string userPassword;
 
         #endregion
 
@@ -61,10 +63,10 @@ namespace UChatClientConsole
         {
         }
 
-        public UChatClientConsole(string name, string to)
+        public UChatClientConsole(string name, string password)
         {
-            userName = name;
-            toName = to;
+            userId = name;
+            userPassword = password;
         }
 
         #region ----------    开启客户机    ----------
@@ -124,19 +126,17 @@ namespace UChatClientConsole
                     string msgReceive = Encoding.UTF8.GetString(arrMsg);                  
 
                     // 消息
-                    if (arrMsg[0] / 4 == 0)
+                    if (arrMsg[0] == IS_LOGIN)
                     {
-                        // 登录信息
-                        if (arrMsg[0] == 3)
-                        {
-                            // TODO: 显示好友登录的信息
-                        }
+                        UserData userData = (UserData)JsonConvert.DeserializeObject(msgReceive.Substring(1, msgReceive.Length - 1), typeof(UserData));
+
+                        Console.WriteLine("登陆成功！{0}:{1}:{2}:{3}", userData.userId, userData.userName, userData.userGender, userData.userAge);
+                    }
+                    else if (arrMsg[0] == MSG_TO_ALL || arrMsg[0] == MSG_TO_INDIVIDULAL)
+                    {
                         // 普通消息
-                        else
-                        {
-                            MsgHandler msgHandler = (MsgHandler)JsonConvert.DeserializeObject(msgReceive.Substring(1, msgReceive.Length - 1), typeof(MsgHandler));
-                            Console.WriteLine("{0} : {1}", msgHandler.from, msgHandler.message);
-                        }
+                        MsgHandler msgHandler = (MsgHandler)JsonConvert.DeserializeObject(msgReceive.Substring(1, msgReceive.Length - 1), typeof(MsgHandler));
+                        Console.WriteLine("{0} : {1}", msgHandler.from, msgHandler.message);
                     }
                     // 文件
                     else if (arrMsg[0] / 4 == 1)
@@ -162,8 +162,8 @@ namespace UChatClientConsole
         public void SendMsg(string msg)
         {
             MsgHandler msgHandler = new MsgHandler();
-            msgHandler.from = userName;
-            msgHandler.to = toName;
+            msgHandler.from = userId;
+            msgHandler.to = "";
             msgHandler.message = msg;
             string msgPackage = JsonConvert.SerializeObject(msgHandler);
 
@@ -171,7 +171,7 @@ namespace UChatClientConsole
             byte[] sendArrMsg = new byte[arrMsg.Length + 1];
             
             // 设置标志位，代表发送消息给个人
-            sendArrMsg[0] = MSG_TO_INDIVIDULAL;
+            sendArrMsg[0] = MSG_TO_ALL;
             Buffer.BlockCopy(arrMsg, 0, sendArrMsg, 1, arrMsg.Length);
 
             try
@@ -195,7 +195,7 @@ namespace UChatClientConsole
 
         public void Login()
         {
-            LoginHandler loginHandler = new LoginHandler(LOGIN, userName, "");
+            LoginHandler loginHandler = new LoginHandler(userId, userPassword);
 
             string msgPackage = JsonConvert.SerializeObject(loginHandler);
 
@@ -210,7 +210,7 @@ namespace UChatClientConsole
             {
                 socketClient.Send(sendArrMsg);
 
-                Console.WriteLine("{0} 登录", userName);
+                Console.WriteLine("{0} 登录", userId);
             }
             catch (SocketException se)
             {
@@ -226,50 +226,83 @@ namespace UChatClientConsole
         }
         #endregion
 
-        #region -------- 用于解析数据的结构体 --------
-        /// <summary>
-        ///     用于JSON解析登录的结构体
-        /// </summary>
-        struct LoginHandler
-        {
-            public int type;
-            public string userName;
-            public string password;
-
-            public LoginHandler(int t, string n, string p)
-            {
-                type = t; userName = n; password = p;
-            }
-        }
-
-        /// <summary>
-        ///     用于JSON解析消息通信的结构体
-        /// </summary>
-        struct MsgHandler
-        {
-            public string from;
-            public string to;
-            public string message;
-
-            public MsgHandler(int o, string f, string t, string m)
-            {
-                from = f; to = t; message = m;
-            }
-        };
-
-        /// <summary>
-        ///     用于JSON解析更新在线好友列表的信息
-        /// </summary>
-        struct FriendlistHandler
-        {
-            public int type;
-            public string friendName;
-
-            public FriendlistHandler(int t, string f)
-            {
-                type = t; friendName = f;
-            }
-        }
-        #endregion
     }
+
+    #region -------- 用于解析数据的结构体 --------
+    /// <summary>
+    ///     用于JSON解析登录的结构体
+    /// </summary>
+    public struct LoginHandler
+    {
+        public string userId;
+        public string userPassword;
+
+        public LoginHandler(string n, string p)
+        {
+            userId = n; userPassword = p;
+        }
+    }
+
+    /// <summary>
+    ///     用于JSON解析注册的结构体
+    /// </summary>
+    public struct RegisterHandler
+    {
+        public string userId;
+        public string userName;
+        public string userPassword;
+        public string userGender;
+        public string userAge;
+
+        public RegisterHandler(string id, string name, string password, string gender, string age)
+        {
+            userId = id; userName = name; userPassword = password; userGender = gender; userAge = age;
+        }
+    }
+
+    /// <summary>
+    ///     用于JSON解析消息通信的结构体
+    /// </summary>
+    public struct MsgHandler
+    {
+        public string from;
+        public string to;
+        public string message;
+
+        public MsgHandler(string f, string t, string m)
+        {
+            from = f; to = t; message = m;
+        }
+    };
+
+    /// <summary>
+    ///     用于JSON解析更新在线好友列表的信息
+    /// </summary>
+    public struct FriendlistHandler
+    {
+        public int type;
+        public string friendName;
+
+        public FriendlistHandler(int t, string f)
+        {
+            type = t; friendName = f;
+        }
+    }
+
+    /// <summary>
+    ///     用于保存从数据库中查找到的用户信息
+    /// </summary>
+    public struct UserData
+    {
+        public string userId;
+        public string userName;
+        public string userGender;
+        public int userAge;
+
+        public UserData(string id, string name, string gender, int age)
+        {
+            userId = id; userName = name; userGender = gender; userAge = age;
+        }
+    }
+    #endregion
 }

@@ -10,14 +10,16 @@ namespace UChatServer
 {
     public class UChatServer
     {
-        #region ----------     定义变量     ----------
+        #region ----------      定义变量      ----------
 
-        #region ----------    定义状态字    ----------
+        #region ----------     定义状态字     ----------
         // 登录/注册 相关
         private const byte LOGIN = 0;
         private const byte REGISTER = 1;
-        private const byte IS_LOGIN_OR_REGISTER = 2;
-        private const byte IS_NOT_LOGIN_OR_REGISTER = 3;
+        private const byte IS_LOGIN = 2;
+        private const byte IS_NOT_LOGIN = 3;
+        private const byte IS_REGISTER = 4;
+        private const byte IS_NOT_REGISTER = 5;
 
         // 用户发送给单个用户 相关
         private const byte INDIVIDUAL_LOWER_BOUND = 10;
@@ -35,6 +37,7 @@ namespace UChatServer
 
         // 服务器向用户提交更新好友状态相关
         private const byte UPDATE_FRIENDLIST = 30;
+        private const byte INIT_FRIENDLIST = 31;
 
         // 在线好友列表状态字
         private const int ADD_ONLINE_FRIEND = 0;
@@ -56,7 +59,7 @@ namespace UChatServer
         //保存了服务器端所有和客户端通信的套接字
         private Dictionary<string, string> dictOnlineUser = new Dictionary<string, string>();
         private Dictionary<string, string> dictOnlineUserO = new Dictionary<string, string>();
-        private Dictionary<string, string> dictOnlineUserI = new Dictionary<string, string>();
+
         #endregion
 
         public UChatServer()
@@ -64,7 +67,7 @@ namespace UChatServer
             databaseHandler = new DatabaseHandler();
         }
 
-        #region ----------    开启服务器    ----------
+        #region ----------     开启服务器     ----------
         /// <summary>
         ///     开启服务器
         /// </summary>
@@ -111,7 +114,7 @@ namespace UChatServer
         }
         #endregion
 
-        #region ----------  监听客户端请求  ----------
+        #region ----------   监听客户端请求   ----------
         /// <summary>
         ///     监听客户端请求
         /// </summary>
@@ -153,7 +156,7 @@ namespace UChatServer
         }
         #endregion
 
-        #region ----------     监听数据     ----------
+        #region ----------      监听数据      ----------
         /// <summary>
         ///     服务端监听客户发来的数据
         /// </summary>
@@ -178,12 +181,12 @@ namespace UChatServer
                     string socketKey = socketClient.RemoteEndPoint.ToString();
                     Console.WriteLine("【错误】" + socketKey + " 接收消息异常 错误信息：" + se.Message);
 
+                    // TODO: 更新客户端显示的在线好友
+
                     // 将出错对象相关联的信息从队列中移除
                     dictOnlineUser.Remove(socketKey);
                     dictSocket.Remove(socketKey);
                     dictThread.Remove(socketKey);
-
-                    // TODO: 更新客户端显示的在线好友
 
                     return;
                 }
@@ -193,10 +196,10 @@ namespace UChatServer
                     return;
                 }
 
-                // 判断客户端信息发来的第一位，如果是LOGIN_OR_REGISTER代表是登录或注册请求
+                // 判断客户端信息发来的第一位，如果是LOGIN代表是登录请求
                 if (msgReceiver[0] == LOGIN)                            
                 {
-                    // TODO: 查询数据库，判断登录状态
+                    // 查询数据库，判断登录状态
                     string loginMsg = Encoding.UTF8.GetString(msgReceiver, 1, length-1);
                     LoginHandler loginHandler = (LoginHandler)JsonConvert.DeserializeObject(loginMsg, typeof(LoginHandler));
 
@@ -208,29 +211,20 @@ namespace UChatServer
                     {
                         Console.WriteLine("用户 : {0} IP : {1} 已连接...", loginHandler.userId, socketClient.RemoteEndPoint.ToString());
 
-                        // 建立传输数据的结构
-                        string userInfo = JsonConvert.SerializeObject(userData);
-                        MsgHandler msgHandler = new MsgHandler(userData.userName, userData.userName, userInfo);
+                        dictOnlineUser.Add(socketClient.RemoteEndPoint.ToString(), loginHandler.userId);
+                        dictOnlineUserO.Add(loginHandler.userId, socketClient.RemoteEndPoint.ToString());
 
-                        string sendMsgTmp = JsonConvert.SerializeObject(msgHandler);
-                        
-                        // 需要包装一下在string数据中嵌入状态字
-                        byte[] arrMsg = Encoding.UTF8.GetBytes(sendMsgTmp);
-                        byte[] sendArrMsg = new byte[arrMsg.Length + 1];
+                        // 确认登录信息
+                        ConfirmLogin(IS_LOGIN, userData);
 
-                        // 设置标志位，代表发送消息给个人
-                        sendArrMsg[0] = IS_LOGIN_OR_REGISTER;
-                        Buffer.BlockCopy(arrMsg, 0, sendArrMsg, 1, arrMsg.Length);
-
-                        // 重新包装为string
-                        string sendMsg = Encoding.UTF8.GetString(sendArrMsg, 0, sendArrMsg.Length);
-
-                        //发送消息
-                        SendMsgToIndividual(sendMsg);
+                        // TODO : 更新在线好友列表
                     }
                     else
                     {
+                        Console.WriteLine("用户 : {0} IP : {1} 试图连接，但密码错误...", loginHandler.userId, socketClient.RemoteEndPoint.ToString());
 
+                        // 确认登录失败
+                        ConfirmLogin(IS_NOT_LOGIN, userData);
                     }
 
                     #region Use For Test
@@ -247,17 +241,29 @@ namespace UChatServer
                        功能测试end */
                     #endregion
                 }
+                //
+                else if (msgReceiver[0] == REGISTER)
+                {
+                    // TODO: 处理注册请求
+
+                }
+                //
+                else if (msgReceiver[0] == INIT_FRIENDLIST)
+                {
+                    // TODO: 用户登陆成功，需要初始化已在线的好友列表
+
+                }
                 // 如果在INDIVIDUAL_LOWER_BOUND和INDIVIDUAL_UPPER_BOUND之间，则是发给特定用户的信息或文件
                 else if (msgReceiver[0] >= INDIVIDUAL_LOWER_BOUND && msgReceiver[0] <= INDIVIDUAL_UPPER_BOUND )       
                 {
-                    // TODO: 发送消息给特定用户
+                    // 发送消息给特定用户
                     string sendMsg = Encoding.UTF8.GetString(msgReceiver, 0, length);
                     SendMsgToIndividual(sendMsg);
                 }
                 // 如果在ALL_LOWER_BOUND和ALL_UPPER_BOUND之间，则是发给所有用户的信息或文件
                 else if (msgReceiver[0] >= ALL_LOWER_BOUND && msgReceiver[0] <= ALL_UPPER_BOUND)               
                 {
-                    // TODO：发送消息给所有用户
+                    // 发送消息给所有用户
                     string sendMsg = Encoding.UTF8.GetString(msgReceiver, 0, length);
                     SendMsgToAll(sendMsg);
                 }
@@ -326,7 +332,7 @@ namespace UChatServer
         }
         #endregion
 
-        #region --------- 发送消息给所有用户 ----------
+        #region ---------- 发送消息给所有用户 ----------
         /// <summary>
         ///     发送消息给所有用户
         /// </summary>
@@ -381,6 +387,52 @@ namespace UChatServer
         }
         #endregion
 
+        #region ----------   确认登录或注册   ----------
+        /// <summary>
+        ///     确认登录信息
+        /// </summary>
+        /// <param name="flag">IS_LOGIN或者IS_NOT_LOGIN</param>
+        /// <param name="userData">用户信息</param>
+        private void ConfirmLogin(byte flag, UserData userData)
+        {
+            string sendMsg;
+
+            if (flag == IS_LOGIN || flag == IS_REGISTER)
+                sendMsg = JsonConvert.SerializeObject(userData);
+            else
+                sendMsg = "";
+
+            byte[] arrMsg = Encoding.UTF8.GetBytes(sendMsg);
+            byte[] sendArrMsg = new byte[arrMsg.Length + 1];
+
+            // 设置标志位，代表登录/注册
+            sendArrMsg[0] = flag;
+            Buffer.BlockCopy(arrMsg, 0, sendArrMsg, 1, arrMsg.Length);
+
+            // 获取发送者的Ip信息
+            string senderIp = dictOnlineUserO[userData.userId];
+
+            // 若不包含发送者的Socket报错
+            if (senderIp == null || senderIp == "")
+            {
+                Console.WriteLine("【错误】【非法消息】消息 \"" + sendMsg.Substring(1, sendMsg.Length - 1) + "\" 发送者不在已存数据中！");
+                return;
+            }
+            else
+                dictSocket[senderIp].Send(sendArrMsg);
+
+        }
+        #endregion
+
+        private void InitFriendlist(string userId, List<UserData> friendlist)
+        {
+            // TODO: 将friendlist中的所
+        }
+
+        private void UpdateFriendlist(byte flag, UserData userData)
+        {
+            // TODO: 更新好友列表
+        }
     }
 
     #region -------- 用于解析数据的结构体 --------
@@ -407,11 +459,26 @@ namespace UChatServer
         public string userName;
         public string userPassword;
         public string userGender;
-        public string userAge;
+        public int userAge;
 
-        public RegisterHandler(string id, string name, string password, string gender, string age)
+        public RegisterHandler(string id, string name, string password, string gender, int age)
         {
             userId = id; userName = name; userPassword = password; userGender = gender; userAge = age;
+        }
+
+        public RegisterHandler(string id, string name, string password)
+        {
+            userId = id; userName = name; userPassword = password; userGender = "男"; userAge = 0;
+        }
+
+        public RegisterHandler(string id, string name, string password, string gender)
+        {
+            userId = id; userName = name; userPassword = password; userGender = gender; userAge = 0;
+        }
+
+        public RegisterHandler(string id, string name, string password, int age)
+        {
+            userId = id; userName = name; userPassword = password; userGender = "男"; userAge = age;
         }
     }
 
@@ -452,9 +519,9 @@ namespace UChatServer
         public string userId;
         public string userName;
         public string userGender;
-        public string userAge;
+        public int userAge;
 
-        public UserData(string id, string name, string gender, string age)
+        public UserData(string id, string name, string gender, int age)
         {
             userId = id; userName = name; userGender = gender; userAge = age;
         }

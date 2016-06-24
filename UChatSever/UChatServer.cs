@@ -14,8 +14,10 @@ namespace UChatServer
 
         #region ----------    定义状态字    ----------
         // 登录/注册 相关
-        private const byte LOGIN_OR_REGISTER = 0;
-        private const byte IS_LOGIN_OR_REGISTER = 1;
+        private const byte LOGIN = 0;
+        private const byte REGISTER = 1;
+        private const byte IS_LOGIN_OR_REGISTER = 2;
+        private const byte IS_NOT_LOGIN_OR_REGISTER = 3;
 
         // 用户发送给单个用户 相关
         private const byte INDIVIDUAL_LOWER_BOUND = 10;
@@ -34,14 +36,12 @@ namespace UChatServer
         // 服务器向用户提交更新好友状态相关
         private const byte UPDATE_FRIENDLIST = 30;
 
-        // 登录注册状态字
-        private const int LOGIN = 0;
-        private const int REGISTER = 1;
-
         // 在线好友列表状态字
         private const int ADD_ONLINE_FRIEND = 0;
         private const int REMOVE_ONLINE_FRIEND = 1;
         #endregion
+
+        private DatabaseHandler databaseHandler;    //数据库连接对象
 
         private const string ipAddr = "127.0.0.1";  //监听ip
         private const int port = 3000;              //监听port
@@ -56,11 +56,12 @@ namespace UChatServer
         //保存了服务器端所有和客户端通信的套接字
         private Dictionary<string, string> dictOnlineUser = new Dictionary<string, string>();
         private Dictionary<string, string> dictOnlineUserO = new Dictionary<string, string>();
+        private Dictionary<string, string> dictOnlineUserI = new Dictionary<string, string>();
         #endregion
 
         public UChatServer()
         {
-
+            databaseHandler = new DatabaseHandler();
         }
 
         #region ----------    开启服务器    ----------
@@ -193,11 +194,47 @@ namespace UChatServer
                 }
 
                 // 判断客户端信息发来的第一位，如果是LOGIN_OR_REGISTER代表是登录或注册请求
-                if (msgReceiver[0] == LOGIN_OR_REGISTER)                            
+                if (msgReceiver[0] == LOGIN)                            
                 {
                     // TODO: 查询数据库，判断登录状态
-                    
-                    // 功能测试
+                    string loginMsg = Encoding.UTF8.GetString(msgReceiver, 1, length-1);
+                    LoginHandler loginHandler = (LoginHandler)JsonConvert.DeserializeObject(loginMsg, typeof(LoginHandler));
+
+                    // 登录 将登录状态返回到flagLogin
+                    UserData userData;
+                    bool flagLogin = databaseHandler.Login(loginHandler.userId, loginHandler.userPassword, out userData);
+
+                    if (flagLogin == true)
+                    {
+                        Console.WriteLine("用户 : {0} IP : {1} 已连接...", loginHandler.userId, socketClient.RemoteEndPoint.ToString());
+
+                        // 建立传输数据的结构
+                        string userInfo = JsonConvert.SerializeObject(userData);
+                        MsgHandler msgHandler = new MsgHandler(userData.userName, userData.userName, userInfo);
+
+                        string sendMsgTmp = JsonConvert.SerializeObject(msgHandler);
+                        
+                        // 需要包装一下在string数据中嵌入状态字
+                        byte[] arrMsg = Encoding.UTF8.GetBytes(sendMsgTmp);
+                        byte[] sendArrMsg = new byte[arrMsg.Length + 1];
+
+                        // 设置标志位，代表发送消息给个人
+                        sendArrMsg[0] = IS_LOGIN_OR_REGISTER;
+                        Buffer.BlockCopy(arrMsg, 0, sendArrMsg, 1, arrMsg.Length);
+
+                        // 重新包装为string
+                        string sendMsg = Encoding.UTF8.GetString(sendArrMsg, 0, sendArrMsg.Length);
+
+                        //发送消息
+                        SendMsgToIndividual(sendMsg);
+                    }
+                    else
+                    {
+
+                    }
+
+                    #region Use For Test
+                    /* 功能测试
 
                     string loginMsg = Encoding.UTF8.GetString(msgReceiver, 1, length - 1);
                     LoginHandler loginHandler = (LoginHandler)JsonConvert.DeserializeObject(loginMsg, typeof(LoginHandler));
@@ -207,7 +244,8 @@ namespace UChatServer
                     dictOnlineUser.Add(socketClient.RemoteEndPoint.ToString(), loginHandler.userName);
                     dictOnlineUserO.Add(loginHandler.userName, socketClient.RemoteEndPoint.ToString());
 
-                    // 功能测试end
+                       功能测试end */
+                    #endregion
                 }
                 // 如果在INDIVIDUAL_LOWER_BOUND和INDIVIDUAL_UPPER_BOUND之间，则是发给特定用户的信息或文件
                 else if (msgReceiver[0] >= INDIVIDUAL_LOWER_BOUND && msgReceiver[0] <= INDIVIDUAL_UPPER_BOUND )       
@@ -266,7 +304,7 @@ namespace UChatServer
                 Console.WriteLine("【错误】【非法消息】此消息接收端不在消息队列中！");
                 return;
             }
-            Console.WriteLine("{0}", targetIp);
+            
             try
             {
                 //将要传输的字符串转换成UTF-8对应的字节数组
@@ -343,50 +381,83 @@ namespace UChatServer
         }
         #endregion
 
-        #region -------- 用于解析数据的结构体 --------
-        /// <summary>
-        ///     用于JSON解析登录的结构体
-        /// </summary>
-        struct LoginHandler
-        {
-            public int type;
-            public string userName;
-            public string password;
-
-            public LoginHandler(int t, string n, string p)
-            {
-                type = t; userName = n; password = p;
-            }
-        }
-
-        /// <summary>
-        ///     用于JSON解析消息通信的结构体
-        /// </summary>
-        struct MsgHandler
-        {
-            public string from;
-            public string to;
-            public string message;
-
-            public MsgHandler(int o, string f, string t, string m)
-            {
-                from = f; to = t; message = m;
-            }
-        };
-
-        /// <summary>
-        ///     用于JSON解析更新在线好友列表的信息
-        /// </summary>
-        struct FriendlistHandler
-        {
-            public int type;
-            public string friendName;
-
-            public FriendlistHandler(int t, string f)
-            {
-                type = t; friendName = f;
-            }
-        }
-        #endregion
     }
+
+    #region -------- 用于解析数据的结构体 --------
+    /// <summary>
+    ///     用于JSON解析登录的结构体
+    /// </summary>
+    public struct LoginHandler
+    {
+        public string userId;
+        public string userPassword;
+
+        public LoginHandler(string n, string p)
+        {
+            userId = n; userPassword = p;
+        }
+    }
+
+    /// <summary>
+    ///     用于JSON解析注册的结构体
+    /// </summary>
+    public struct RegisterHandler
+    {
+        public string userId;
+        public string userName;
+        public string userPassword;
+        public string userGender;
+        public string userAge;
+
+        public RegisterHandler(string id, string name, string password, string gender, string age)
+        {
+            userId = id; userName = name; userPassword = password; userGender = gender; userAge = age;
+        }
+    }
+
+    /// <summary>
+    ///     用于JSON解析消息通信的结构体
+    /// </summary>
+    public struct MsgHandler
+    {
+        public string from;
+        public string to;
+        public string message;
+
+        public MsgHandler(string f, string t, string m)
+        {
+            from = f; to = t; message = m;
+        }
+    };
+
+    /// <summary>
+    ///     用于JSON解析更新在线好友列表的信息
+    /// </summary>
+    public struct FriendlistHandler
+    {
+        public int type;
+        public string friendName;
+
+        public FriendlistHandler(int t, string f)
+        {
+            type = t; friendName = f;
+        }
+    }
+
+    /// <summary>
+    ///     用于保存从数据库中查找到的用户信息
+    /// </summary>
+    public struct UserData
+    {
+        public string userId;
+        public string userName;
+        public string userGender;
+        public string userAge;
+
+        public UserData(string id, string name, string gender, string age)
+        {
+            userId = id; userName = name; userGender = gender; userAge = age;
+        }
+    }
+    #endregion
 }

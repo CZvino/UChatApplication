@@ -14,8 +14,10 @@ namespace UChatClientConsole
 
         #region ----------    定义状态字    ----------
         // 登录/注册 相关
-        private const byte LOGIN_OR_REGISTER = 0;
-        private const byte IS_LOGIN_OR_REGISTER = 1;
+        private const byte LOGIN = 0;
+        private const byte REGISTER = 1;
+        private const byte IS_LOGIN_OR_REGISTER = 2;
+        private const byte IS_NOT_LOGIN_OR_REGISTER = 3;
 
         // 用户发送给单个用户 相关
         private const byte INDIVIDUAL_LOWER_BOUND = 10;
@@ -33,10 +35,6 @@ namespace UChatClientConsole
 
         // 服务器向用户提交更新好友状态相关
         private const byte UPDATE_FRIENDLIST = 30;
-
-        // 登录注册状态字
-        private const int LOGIN = 0;
-        private const int REGISTER = 1;
 
         // 在线好友列表状态字
         private const int ADD_ONLINE_FRIEND = 0;
@@ -205,7 +203,7 @@ namespace UChatClientConsole
             byte[] sendArrMsg = new byte[arrMsg.Length + 1];
 
             // 设置标志位，代表登录
-            sendArrMsg[0] = LOGIN_OR_REGISTER;
+            sendArrMsg[0] = LOGIN;
             Buffer.BlockCopy(arrMsg, 0, sendArrMsg, 1, arrMsg.Length);
 
             try

@@ -130,8 +130,11 @@ namespace UChatServer
                     socketConnection = socketWatch.Accept();
                     string socketKey = socketConnection.RemoteEndPoint.ToString();
 
+
                     //将每个新产生的socket存起来，以客户端IP:端口作为key
                     dictSocket.Add(socketKey, socketConnection);
+
+                    //Console.WriteLine("{0}:建立连接", socketKey);
 
                     //为每个服务端通信socket创建一个单独的通信线程，负责调用通信socket的Receive方法，监听客户端发来的数据
                     //创建通信线程
@@ -182,16 +185,21 @@ namespace UChatServer
                     Console.WriteLine("【错误】" + socketKey + " 接收消息异常 错误信息：" + se.Message);
 
                     // 更新客户端显示的在线好友
-                    string userId = dictOnlineUser[socketKey];
-                    UserData userData = databaseHandler.QueryUserData(userId);
+                    if (dictOnlineUser.ContainsKey(socketKey))
+                    {
+                        string userId = dictOnlineUser[socketKey];
+                        UserData userData = databaseHandler.QueryUserData(userId);
 
-                    List<UserData> listUserData = databaseHandler.FindFriendOfSomeone(userId);
+                        List<UserData> listUserData = databaseHandler.FindFriendOfSomeone(userId);
 
-                    UpdateFriendlist(REMOVE_ONLINE_FRIEND, userData, listUserData);
+                        UpdateFriendlist(REMOVE_ONLINE_FRIEND, userData, listUserData);
+
+                        // 将出错对象相关联的信息从队列中移除
+                        dictOnlineUserO.Remove(userId);
+                        dictOnlineUser.Remove(socketKey);
+                    }
 
                     // 将出错对象相关联的信息从队列中移除
-                    dictOnlineUserO.Remove(userId);
-                    dictOnlineUser.Remove(socketKey);
                     dictSocket.Remove(socketKey);
                     dictThread.Remove(socketKey);
 
@@ -218,8 +226,19 @@ namespace UChatServer
                     {
                         Console.WriteLine("用户 : {0} IP : {1} 已连接...", loginHandler.userId, socketClient.RemoteEndPoint.ToString());
 
-                        dictOnlineUser.Add(socketClient.RemoteEndPoint.ToString(), loginHandler.userId);
-                        dictOnlineUserO.Add(loginHandler.userId, socketClient.RemoteEndPoint.ToString());
+                        // 如果ip未出现过，则增加数据
+                        if (dictOnlineUser.ContainsKey(socketClient.RemoteEndPoint.ToString()) == false)
+                        {
+                            dictOnlineUser.Add(socketClient.RemoteEndPoint.ToString(), loginHandler.userId);
+                            dictOnlineUserO.Add(loginHandler.userId, socketClient.RemoteEndPoint.ToString());
+                        }
+                        // 否则，修改数据
+                        else
+                        {
+                            dictOnlineUserO.Remove(dictOnlineUser[socketClient.RemoteEndPoint.ToString()]);
+                            dictOnlineUser[socketClient.RemoteEndPoint.ToString()] = loginHandler.userId;
+                            dictOnlineUserO.Add(loginHandler.userId, socketClient.RemoteEndPoint.ToString());
+                        }
 
                         // 确认登录信息
                         Confirm(IS_LOGIN, userData);
@@ -231,10 +250,25 @@ namespace UChatServer
                     }
                     else
                     {
-                        Console.WriteLine("用户 : {0} IP : {1} 试图连接，但密码错误...", loginHandler.userId, socketClient.RemoteEndPoint.ToString());
+                        Console.WriteLine("用户 : {0} IP : {1} 试图连接，但用户名或密码错误...", loginHandler.userId, socketClient.RemoteEndPoint.ToString());
 
+                        // 如果ip未出现过，则增加数据
+                        if (dictOnlineUser.ContainsKey(socketClient.RemoteEndPoint.ToString()) == false)
+                        {
+                            dictOnlineUser.Add(socketClient.RemoteEndPoint.ToString(), loginHandler.userId);
+                            dictOnlineUserO.Add(loginHandler.userId, socketClient.RemoteEndPoint.ToString());
+                        }
+                        // 否则，修改数据
+                        else
+                        {
+                            dictOnlineUserO.Remove(dictOnlineUser[socketClient.RemoteEndPoint.ToString()]);
+                            dictOnlineUser[socketClient.RemoteEndPoint.ToString()] = loginHandler.userId;
+                            dictOnlineUserO.Add(loginHandler.userId, socketClient.RemoteEndPoint.ToString());
+                        }
+
+                        UserData failedUserData = new UserData(loginHandler.userId, "", "", 0);
                         // 确认登录失败
-                        Confirm(IS_NOT_LOGIN, userData);
+                        Confirm(IS_NOT_LOGIN, failedUserData);
                     }
 
                     #region Use For Test
@@ -517,7 +551,7 @@ namespace UChatServer
         /// <param name="friendlist">新上线用户的好友列表</param>
         private void UpdateFriendlist(byte flag, UserData userData, List<UserData> friendlist)
         {
-            // TODO: 更新好友列表
+            // 更新好友列表
             FriendlistHandler friendlistHandler = new FriendlistHandler(flag, userData);
 
             string sendMsg = JsonConvert.SerializeObject(friendlistHandler);

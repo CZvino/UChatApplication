@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UChatServer", "UChatSever\U
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UChatClientConsole", "UChatClientConsole\UChatClientConsole.csproj", "{AA42D002-A9BB-443A-A0B2-1E2AC45580BC}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UChatClient", "UChatClient\UChatClient.csproj", "{55FA3B6A-53A9-4A8C-A9D6-FDAB23959522}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +23,10 @@ Global
 		{AA42D002-A9BB-443A-A0B2-1E2AC45580BC}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{AA42D002-A9BB-443A-A0B2-1E2AC45580BC}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{AA42D002-A9BB-443A-A0B2-1E2AC45580BC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{55FA3B6A-53A9-4A8C-A9D6-FDAB23959522}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{55FA3B6A-53A9-4A8C-A9D6-FDAB23959522}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{55FA3B6A-53A9-4A8C-A9D6-FDAB23959522}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{55FA3B6A-53A9-4A8C-A9D6-FDAB23959522}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

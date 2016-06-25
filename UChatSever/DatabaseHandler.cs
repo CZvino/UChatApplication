@@ -42,7 +42,9 @@ namespace UChatServer
             com = new SqlCommand();
             com.Connection = con;
             com.CommandType = CommandType.Text;
-            
+
+            SqlDataReader ans;
+
             // 随机生成一个id，检查数据库中是否含有此id，直到生成一个未注册的id返回
             while (true)
             {
@@ -52,11 +54,15 @@ namespace UChatServer
                 com.CommandText = "select * from UserInfo where id = '" + id + "'";
 
                 // 获得查询结果
-                SqlDataReader ans = com.ExecuteReader();
+                ans = com.ExecuteReader();
 
                 if (!ans.Read())
                     break;
+
+                ans.Close();
             }
+
+            ans.Close();
 
             return id;
         }
@@ -87,12 +93,18 @@ namespace UChatServer
             {
                 if (Convert.ToString(ans[1]).Trim().Equals(userPassword))
                 {
-                    userData = new UserData((string)ans[0], (string)ans[2], (string)ans[3], (int)ans[4]);                   
+                    userData = new UserData((string)ans[0], (string)ans[2], (string)ans[3], (int)ans[4]);
+                    ans.Close();
                     return true;
                 }
                 else
+                {
+                    ans.Close();
                     return false;
+                }
             }
+
+            ans.Close();
             return false;
         }
         #endregion
@@ -138,7 +150,7 @@ namespace UChatServer
             com = new SqlCommand();
             com.Connection = con;
             com.CommandType = CommandType.Text;
-            com.CommandText = "select id, name, gender, age from UserInfo wherr id = '" + queryUserId + "'";
+            com.CommandText = "select id, name, gender, age from UserInfo where id = '" + queryUserId + "'";
 
             // 获得查询结果
             SqlDataReader ans =  com.ExecuteReader();
@@ -148,6 +160,8 @@ namespace UChatServer
             // 保存信息
             if (ans.Read())
                 userData = new UserData((string)ans[0], (string)ans[1], (string)ans[2], (int)ans[3]);
+
+            ans.Close();
 
             return userData;
         }
@@ -178,15 +192,19 @@ namespace UChatServer
                 ans.Add(userData);
             }
 
+            rst.Close();
+
             com.CommandText = "select id, name, gender, age from Friendship, UserInfo where idB = '" + userId + "' and id = idA";
+            
+            SqlDataReader res = com.ExecuteReader();
 
-            rst = com.ExecuteReader();
-
-            while (rst.Read())
+            while (res.Read())
             {
-                UserData userData = new UserData((string)rst[0], (string)rst[1], (string)rst[2], (int)rst[3]);
+                UserData userData = new UserData((string)res[0], (string)res[1], (string)res[2], (int)res[3]);
                 ans.Add(userData);
             }
+
+            res.Close();
 
             return ans;
         }

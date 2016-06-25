@@ -181,9 +181,16 @@ namespace UChatServer
                     string socketKey = socketClient.RemoteEndPoint.ToString();
                     Console.WriteLine("【错误】" + socketKey + " 接收消息异常 错误信息：" + se.Message);
 
-                    // TODO: 更新客户端显示的在线好友
+                    // 更新客户端显示的在线好友
+                    string userId = dictOnlineUser[socketKey];
+                    UserData userData = databaseHandler.QueryUserData(userId);
+
+                    List<UserData> listUserData = databaseHandler.FindFriendOfSomeone(userId);
+
+                    UpdateFriendlist(REMOVE_ONLINE_FRIEND, userData, listUserData);
 
                     // 将出错对象相关联的信息从队列中移除
+                    dictOnlineUserO.Remove(userId);
                     dictOnlineUser.Remove(socketKey);
                     dictSocket.Remove(socketKey);
                     dictThread.Remove(socketKey);
@@ -215,16 +222,19 @@ namespace UChatServer
                         dictOnlineUserO.Add(loginHandler.userId, socketClient.RemoteEndPoint.ToString());
 
                         // 确认登录信息
-                        ConfirmLogin(IS_LOGIN, userData);
+                        Confirm(IS_LOGIN, userData);
 
-                        // TODO : 更新在线好友列表
+                        // 更新在线好友列表
+                        List<UserData> listUserData = databaseHandler.FindFriendOfSomeone(userData.userId);
+
+                        UpdateFriendlist(ADD_ONLINE_FRIEND, userData, listUserData);
                     }
                     else
                     {
                         Console.WriteLine("用户 : {0} IP : {1} 试图连接，但密码错误...", loginHandler.userId, socketClient.RemoteEndPoint.ToString());
 
                         // 确认登录失败
-                        ConfirmLogin(IS_NOT_LOGIN, userData);
+                        Confirm(IS_NOT_LOGIN, userData);
                     }
 
                     #region Use For Test
@@ -244,13 +254,49 @@ namespace UChatServer
                 //
                 else if (msgReceiver[0] == REGISTER)
                 {
-                    // TODO: 处理注册请求
+                    // 处理注册请求
+                    string registerMsg = Encoding.UTF8.GetString(msgReceiver, 1, length - 1);
+                    RegisterHandler registerHandler = (RegisterHandler)JsonConvert.DeserializeObject(registerMsg, typeof(RegisterHandler));
 
+                    // 获取一个未被注册的ID
+                    string userId = databaseHandler.GetNewId();
+
+                    // 注册新用户
+                    bool flagRegister = databaseHandler.Register(userId, 
+                                                                    registerHandler.userName, 
+                                                                    registerHandler.userPassword, 
+                                                                    registerHandler.userGender, 
+                                                                    registerHandler.userAge);
+
+                    UserData userData = new UserData(userId, registerHandler.userName, registerHandler.userGender, registerHandler.userAge);
+
+                    if (flagRegister == true)
+                    {
+                        Console.WriteLine("用户 : {0} IP : {1} 注册成功...", userId, socketClient.RemoteEndPoint.ToString());
+
+                        // 确认注册信息
+                        Confirm(IS_REGISTER, userData);
+                    }
+                    else
+                    {
+                        Console.WriteLine("用户 : {0} IP : {1} 注册失败...", userId, socketClient.RemoteEndPoint.ToString());
+
+                        // 确认登录失败
+                        Confirm(IS_NOT_LOGIN, userData);
+                    }
                 }
-                //
+                // 用户登陆成功，需要初始化已在线的好友列表
                 else if (msgReceiver[0] == INIT_FRIENDLIST)
                 {
-                    // TODO: 用户登陆成功，需要初始化已在线的好友列表
+                    // 获取用户id
+                    string userIp = socketClient.RemoteEndPoint.ToString();
+                    string userId = dictOnlineUser[userIp];
+
+                    // 查找用户好友
+                    List<UserData> listUserData = databaseHandler.FindFriendOfSomeone(userId);
+
+                    // 初始化好友列表
+                    InitFriendlist(userIp, listUserData);
 
                 }
                 // 如果在INDIVIDUAL_LOWER_BOUND和INDIVIDUAL_UPPER_BOUND之间，则是发给特定用户的信息或文件
@@ -272,12 +318,19 @@ namespace UChatServer
                     string socketKey = socketClient.RemoteEndPoint.ToString();
                     Console.WriteLine("【错误】" + socketKey + " 接收消息异常");
 
+                    // 更新客户端显示的在线好友
+                    string userId = dictOnlineUser[socketKey];
+                    UserData userData = databaseHandler.QueryUserData(userId);
+
+                    List<UserData> listUserData = databaseHandler.FindFriendOfSomeone(userId);
+
+                    UpdateFriendlist(REMOVE_ONLINE_FRIEND, userData, listUserData);
+
                     // 将出错对象相关联的信息从队列中移除
+                    dictOnlineUserO.Remove(userId);
                     dictOnlineUser.Remove(socketKey);
                     dictSocket.Remove(socketKey);
                     dictThread.Remove(socketKey);
-
-                    // TODO: 更新客户端显示的在线好友
                 }
             }
         }
@@ -393,7 +446,7 @@ namespace UChatServer
         /// </summary>
         /// <param name="flag">IS_LOGIN或者IS_NOT_LOGIN</param>
         /// <param name="userData">用户信息</param>
-        private void ConfirmLogin(byte flag, UserData userData)
+        private void Confirm(byte flag, UserData userData)
         {
             string sendMsg;
 
@@ -424,14 +477,70 @@ namespace UChatServer
         }
         #endregion
 
-        private void InitFriendlist(string userId, List<UserData> friendlist)
+        #region ----------   初始化好友列表   ----------
+        /// <summary>
+        ///     将friendlist中的所有好友信息发给用户以更新
+        /// </summary>
+        /// <param name="userIp">请求ip</param>
+        /// <param name="friendlist">好友列表</param>
+        private void InitFriendlist(string userIp, List<UserData> friendlist)
         {
-            // TODO: 将friendlist中的所
-        }
+            // 遍历用户 
+            foreach (UserData userData in friendlist)
+            {
+                // 当前用户在线
+                if (dictOnlineUserO.ContainsKey(userData.userId))
+                {
+                    // 包装消息
+                    FriendlistHandler friendlistHandler = new FriendlistHandler(ADD_ONLINE_FRIEND, userData);
+                    string sendMsg = JsonConvert.SerializeObject(friendlistHandler);
 
-        private void UpdateFriendlist(byte flag, UserData userData)
+                    byte[] arrMsg = Encoding.UTF8.GetBytes(sendMsg);
+                    byte[] sendArrMsg = new byte[arrMsg.Length + 1];
+
+                    // 设置标志位，代表登录/注册
+                    sendArrMsg[0] = UPDATE_FRIENDLIST;
+                    Buffer.BlockCopy(arrMsg, 0, sendArrMsg, 1, arrMsg.Length);
+
+                    dictSocket[userIp].Send(sendArrMsg);
+                }
+            }
+        }
+        #endregion
+
+
+        /// <summary>
+        ///     更新好友列表
+        /// </summary>
+        /// <param name="flag">增加/删除</param>
+        /// <param name="userData">新上线的用户信息</param>
+        /// <param name="friendlist">新上线用户的好友列表</param>
+        private void UpdateFriendlist(byte flag, UserData userData, List<UserData> friendlist)
         {
             // TODO: 更新好友列表
+            FriendlistHandler friendlistHandler = new FriendlistHandler(flag, userData);
+
+            string sendMsg = JsonConvert.SerializeObject(friendlistHandler);
+
+            byte[] arrMsg = Encoding.UTF8.GetBytes(sendMsg);
+            byte[] sendArrMsg = new byte[arrMsg.Length + 1];
+
+            // 设置标志位，代表登录/注册
+            sendArrMsg[0] = UPDATE_FRIENDLIST;
+            Buffer.BlockCopy(arrMsg, 0, sendArrMsg, 1, arrMsg.Length);
+
+            foreach (UserData userdata in friendlist)
+            {
+                // 如果用户在上线用户中
+                if (dictOnlineUserO.ContainsKey(userdata.userId) == true)
+                {
+                    // 找到Ip
+                    string userIp = dictOnlineUserO[userdata.userId];
+
+                    // 发送消息
+                    dictSocket[userIp].Send(sendArrMsg);
+                }
+            }
         }
     }
 
@@ -503,11 +612,11 @@ namespace UChatServer
     public struct FriendlistHandler
     {
         public int type;
-        public string friendName;
+        public UserData friendInfo;
 
-        public FriendlistHandler(int t, string f)
+        public FriendlistHandler(int t, UserData f)
         {
-            type = t; friendName = f;
+            type = t; friendInfo = f;
         }
     }
 

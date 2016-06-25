@@ -28,6 +28,40 @@ namespace UChatServer
             }
         }
 
+        #region ----------   获取注册的新id   ----------
+        /// <summary>
+        ///     为注册用户获取一个新的id
+        /// </summary>
+        /// <returns>返回注册的id</returns>
+        public string GetNewId()
+        {
+            string id = "";
+            Random rnd = new Random();
+
+            // 初始化查询语句
+            com = new SqlCommand();
+            com.Connection = con;
+            com.CommandType = CommandType.Text;
+            
+            // 随机生成一个id，检查数据库中是否含有此id，直到生成一个未注册的id返回
+            while (true)
+            {
+                for (int i = 0; i < 8; i++)
+                    id = rnd.Next(0, 10).ToString() + id;
+
+                com.CommandText = "select * from UserInfo where id = '" + id + "'";
+
+                // 获得查询结果
+                SqlDataReader ans = com.ExecuteReader();
+
+                if (!ans.Read())
+                    break;
+            }
+
+            return id;
+        }
+        #endregion
+
         #region ----------        登录        ----------
         /// <summary>
         ///     登录
@@ -63,7 +97,7 @@ namespace UChatServer
         }
         #endregion
 
-        #region ----------    用户注册    ----------
+        #region ----------      用户注册      ----------
         /// <summary>
         ///     用户注册
         /// </summary>
@@ -98,7 +132,7 @@ namespace UChatServer
         /// </summary>
         /// <param name="queryUserId">查询信息的用户id</param>
         /// <returns>返回结果串</returns>
-        public string QueryUserData(string queryUserId)
+        public UserData QueryUserData(string queryUserId)
         {
             // 初始化查询语句
             com = new SqlCommand();
@@ -115,7 +149,46 @@ namespace UChatServer
             if (ans.Read())
                 userData = new UserData((string)ans[0], (string)ans[1], (string)ans[2], (int)ans[3]);
 
-            return JsonConvert.SerializeObject(userData);
+            return userData;
+        }
+        #endregion
+
+        #region ---------- 查询某个用户的好友 ----------
+        /// <summary>
+        ///     查询某个用户的好友
+        /// </summary>
+        /// <param name="userId">用户id</param>
+        /// <returns>好友信息列表</returns>
+        public List<UserData> FindFriendOfSomeone(string userId)
+        {
+            List<UserData> ans = new List<UserData>();
+
+            // 初始化查询语句
+            com = new SqlCommand();
+            com.Connection = con;
+            com.CommandType = CommandType.Text;
+            com.CommandText = "select id, name, gender, age from Friendship, UserInfo where idA = '" + userId + "' and id = idB";
+
+            // 获得查询结果
+            SqlDataReader rst = com.ExecuteReader();
+
+            while(rst.Read())
+            {
+                UserData userData = new UserData((string)rst[0], (string)rst[1], (string)rst[2], (int)rst[3]);
+                ans.Add(userData);
+            }
+
+            com.CommandText = "select id, name, gender, age from Friendship, UserInfo where idB = '" + userId + "' and id = idA";
+
+            rst = com.ExecuteReader();
+
+            while (rst.Read())
+            {
+                UserData userData = new UserData((string)rst[0], (string)rst[1], (string)rst[2], (int)rst[3]);
+                ans.Add(userData);
+            }
+
+            return ans;
         }
         #endregion
     }

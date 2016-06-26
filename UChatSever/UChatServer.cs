@@ -49,8 +49,6 @@ namespace UChatServer
 
         #endregion
 
-        private DatabaseHandler databaseHandler;    //数据库连接对象
-
         private const string ipAddr = "127.0.0.1";  //监听ip
         private const int port = 3000;              //监听port
 
@@ -61,6 +59,8 @@ namespace UChatServer
         private Dictionary<string, Thread> dictThread = new Dictionary<string, Thread>();
         //保存了所有客户端通信的套接字和客户端的用户名
         private Dictionary<string, Socket> dictSocket = new Dictionary<string, Socket>();
+        //保存了所有用户所含有的数据库操作元素
+        private Dictionary<string, DatabaseHandler> dictDatabaseHandler = new Dictionary<string, DatabaseHandler>();
         //保存了服务器端所有和客户端通信的套接字
         private Dictionary<string, string> dictOnlineUser = new Dictionary<string, string>();
         private Dictionary<string, string> dictOnlineUserO = new Dictionary<string, string>();
@@ -69,7 +69,6 @@ namespace UChatServer
 
         public UChatServer()
         {
-            databaseHandler = new DatabaseHandler();
         }
 
         #region ----------     开启服务器     ----------
@@ -141,6 +140,10 @@ namespace UChatServer
 
                     Console.WriteLine("用户IP : {0} 已连接...", socketKey);
 
+                    //为每个用户创建一个数据库操作元
+                    DatabaseHandler databaseHandler = new DatabaseHandler();
+                    dictDatabaseHandler.Add(socketKey, databaseHandler);
+
                     //为每个服务端通信socket创建一个单独的通信线程，负责调用通信socket的Receive方法，监听客户端发来的数据
                     //创建通信线程
                     Thread threadCommunicate = new Thread(ReceiveMsg);
@@ -193,9 +196,9 @@ namespace UChatServer
                     if (dictOnlineUser.ContainsKey(socketKey))
                     {
                         string userId = dictOnlineUser[socketKey];
-                        UserData userData = databaseHandler.QueryUserData(userId);
+                        UserData userData = dictDatabaseHandler[socketKey].QueryUserData(userId);
 
-                        List<UserData> listUserData = databaseHandler.FindFriendOfSomeone(userId);
+                        List<UserData> listUserData = dictDatabaseHandler[socketKey].FindFriendOfSomeone(userId);
 
                         UpdateFriendlist(REMOVE_ONLINE_FRIEND, userData, listUserData);
 
@@ -210,7 +213,7 @@ namespace UChatServer
                     // 将出错对象相关联的信息从队列中移除
                     dictSocket.Remove(socketKey);
                     dictThread.Remove(socketKey);
-
+                    dictDatabaseHandler.Remove(socketKey);
                     tmp.Abort();
 
                     return;
@@ -230,7 +233,7 @@ namespace UChatServer
 
                     // 登录 将登录状态返回到flagLogin
                     UserData userData;
-                    bool flagLogin = databaseHandler.Login(loginHandler.userId, loginHandler.userPassword, out userData);
+                    bool flagLogin = dictDatabaseHandler[socketClient.RemoteEndPoint.ToString()].Login(loginHandler.userId, loginHandler.userPassword, out userData);
 
                     if (flagLogin == true)
                     {
@@ -254,7 +257,7 @@ namespace UChatServer
                         Confirm(IS_LOGIN, userData, socketClient.RemoteEndPoint.ToString());
 
                         // 更新在线好友列表
-                        List<UserData> listUserData = databaseHandler.FindFriendOfSomeone(userData.userId);
+                        List<UserData> listUserData = dictDatabaseHandler[socketClient.RemoteEndPoint.ToString()].FindFriendOfSomeone(userData.userId);
 
                         UpdateFriendlist(ADD_ONLINE_FRIEND, userData, listUserData);
                     }
@@ -303,10 +306,10 @@ namespace UChatServer
                     RegisterHandler registerHandler = (RegisterHandler)JsonConvert.DeserializeObject(registerMsg, typeof(RegisterHandler));
 
                     // 获取一个未被注册的ID
-                    string userId = databaseHandler.GetNewId();
+                    string userId = dictDatabaseHandler[socketClient.RemoteEndPoint.ToString()].GetNewId();
 
                     // 注册新用户
-                    bool flagRegister = databaseHandler.Register(userId, 
+                    bool flagRegister = dictDatabaseHandler[socketClient.RemoteEndPoint.ToString()].Register(userId, 
                                                                     registerHandler.userName, 
                                                                     registerHandler.userPassword, 
                                                                     registerHandler.userGender, 
@@ -338,7 +341,7 @@ namespace UChatServer
                     string updateMsg = Encoding.UTF8.GetString(msgReceiver, 1, length - 1);
                     RegisterHandler registerHandler = (RegisterHandler)JsonConvert.DeserializeObject(updateMsg, typeof(RegisterHandler));
 
-                    bool flagUpdate = databaseHandler.UpdateUserInfo(registerHandler);
+                    bool flagUpdate = dictDatabaseHandler[socketClient.RemoteEndPoint.ToString()].UpdateUserInfo(registerHandler);
 
                     UserData userData;
 
@@ -366,7 +369,7 @@ namespace UChatServer
                     string userId = dictOnlineUser[userIp];
 
                     // 查找用户好友
-                    List<UserData> listUserData = databaseHandler.FindFriendOfSomeone(userId);
+                    List<UserData> listUserData = dictDatabaseHandler[userIp].FindFriendOfSomeone(userId);
 
                     // 初始化好友列表
                     InitFriendlist(userIp, listUserData);
@@ -395,11 +398,11 @@ namespace UChatServer
                     if (dictOnlineUser.ContainsKey(socketKey) == true)
                     {
                         string userId = dictOnlineUser[socketKey];
-                        UserData userData = databaseHandler.QueryUserData(userId);
+                        UserData userData = dictDatabaseHandler[socketKey].QueryUserData(userId);
 
                         Console.WriteLine("用户 : {0} IP : {1} 已下线...", userId, socketKey);
 
-                        List<UserData> listUserData = databaseHandler.FindFriendOfSomeone(userId);
+                        List<UserData> listUserData = dictDatabaseHandler[socketKey].FindFriendOfSomeone(userId);
 
                         UpdateFriendlist(REMOVE_ONLINE_FRIEND, userData, listUserData);
 
@@ -415,6 +418,7 @@ namespace UChatServer
                     // 将下线对象移除列表
                     dictSocket.Remove(socketKey);
                     dictThread.Remove(socketKey);
+                    dictDatabaseHandler.Remove(socketKey);
 
                     tmp.Abort();
                 }
@@ -427,9 +431,9 @@ namespace UChatServer
                     if (dictOnlineUser.ContainsKey(socketKey) == true)
                     {
                         string userId = dictOnlineUser[socketKey];
-                        UserData userData = databaseHandler.QueryUserData(userId);
+                        UserData userData = dictDatabaseHandler[socketKey].QueryUserData(userId);
 
-                        List<UserData> listUserData = databaseHandler.FindFriendOfSomeone(userId);
+                        List<UserData> listUserData = dictDatabaseHandler[socketKey].FindFriendOfSomeone(userId);
 
                         UpdateFriendlist(REMOVE_ONLINE_FRIEND, userData, listUserData);
 
@@ -444,6 +448,7 @@ namespace UChatServer
                     // 将出错对象相关联的信息从队列中移除                   
                     dictSocket.Remove(socketKey);
                     dictThread.Remove(socketKey);
+                    dictDatabaseHandler.Remove(socketKey);
 
                     tmp.Abort();
                 }
@@ -608,6 +613,7 @@ namespace UChatServer
                     Buffer.BlockCopy(arrMsg, 0, sendArrMsg, 1, arrMsg.Length);
 
                     dictSocket[userIp].Send(sendArrMsg);
+                    Thread.Sleep(200);
                 }
             }
         }
@@ -639,12 +645,19 @@ namespace UChatServer
                 // 如果用户在上线用户中
                 if (dictOnlineUserO.ContainsKey(userdata.userId) == true)
                 {
-                    
                     // 找到Ip
                     string userIp = dictOnlineUserO[userdata.userId];
 
-                    // 发送消息
-                    dictSocket[userIp].Send(sendArrMsg);
+                    try
+                    {
+                        // 发送消息
+                        dictSocket[userIp].Send(sendArrMsg);
+                    }
+                    catch
+                    {
+
+                    }
+                    
                 }
             }
         }

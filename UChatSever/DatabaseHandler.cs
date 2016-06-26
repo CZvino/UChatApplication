@@ -200,9 +200,12 @@ namespace UChatServer
 
             rst.Close();
 
-            com.CommandText = "select id, name, gender, age from Friendship, UserInfo where idB = '" + userId + "' and id = idA";
+            SqlCommand comm = new SqlCommand();
+            comm.Connection = con;
+            comm.CommandType = CommandType.Text;
+            comm.CommandText = "select id, name, gender, age from Friendship, UserInfo where idB = '" + userId + "' and id = idA";
             
-            SqlDataReader res = com.ExecuteReader();
+            SqlDataReader res = comm.ExecuteReader();
 
             while (res.Read())
             {

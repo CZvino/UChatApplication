@@ -14,8 +14,8 @@
             <TextBox x:Name="userPasswordRegister" Width = "100" Height="25" Text="" VerticalContentAlignment="Center" HorizontalContentAlignment="Left" Canvas.Left="85" Canvas.Top="40" TextChanged="userInfoEdit_TextChanged" />
             <Label x:Name="userGenderTagRegister" Width = "60" Height="25" Content="性   别：" VerticalContentAlignment="Center" HorizontalContentAlignment="Left" Canvas.Left="20" Canvas.Top="70" />
             <ComboBox  x:Name="userGenderRegister" Width = "100" Height="25" Text="" VerticalContentAlignment="Center" HorizontalContentAlignment="Center" Canvas.Left="85" Canvas.Top="70" >
-                <ComboBoxItem x:Name="male" Content="男"/>
-                <ComboBoxItem x:Name="female" Content="女"/>
+                <ComboBoxItem x:Name="rmale" Content="男"/>
+                <ComboBoxItem x:Name="rfemale" Content="女"/>
             </ComboBox>
             <Label x:Name="userAgeTagRegister" Width = "60" Height="25" Content="年   龄：" VerticalContentAlignment="Center" HorizontalContentAlignment="Left" Canvas.Left="20" Canvas.Top="100" />
             <TextBox  x:Name="userAgeRegister" Width = "100" Height="25" Text="" VerticalContentAlignment="Center" HorizontalContentAlignment="Left" Canvas.Left="85" Canvas.Top="100" PreviewTextInput="accountTextBox_PreviewTextInput" TextChanged="userInfoEdit_TextChanged" />
@@ -31,12 +31,12 @@
             <TextBox x:Name="userPasswordEdit" Width = "100" Height="25" Text="" VerticalContentAlignment="Center" HorizontalContentAlignment="Left" Canvas.Left="90" Canvas.Top="70" TextChanged="userInfoEdit_TextChanged" />
             <Label x:Name="userGenderTagEdit" Width = "60" Height="25" Content="性别：" VerticalContentAlignment="Center" HorizontalContentAlignment="Left" Canvas.Left="25" Canvas.Top="100" />
             <ComboBox  x:Name="userGenderEdit" Width = "50" Height="25" Text="" VerticalContentAlignment="Center" HorizontalContentAlignment="Left" Canvas.Left="70" Canvas.Top="100" >
-                <ComboBoxItem x:Name="rmale" Content="男"/>
-                <ComboBoxItem x:Name="rfemale" Content="女"/>
+                <ComboBoxItem x:Name="male" Content="男"/>
+                <ComboBoxItem x:Name="female" Content="女"/>
             </ComboBox>
             <Label x:Name="userAgeTagEdit" Width = "40" Height="25" Content="年龄：" VerticalContentAlignment="Center" HorizontalContentAlignment="Left" Canvas.Left="120" Canvas.Top="100" />
             <TextBox  x:Name="userAgeEdit" Width = "30" Height="25" Text="" VerticalContentAlignment="Center" HorizontalContentAlignment="Left" Canvas.Left="160" Canvas.Top="100" PreviewTextInput="accountTextBox_PreviewTextInput" TextChanged="userInfoEdit_TextChanged" />
-            <Button x:Name="editInfoConfirm" Width="50" Height="20" Content="注册" VerticalContentAlignment="Center" HorizontalContentAlignment="Center" Canvas.Left="50" Canvas.Top="135" Click="editInfoConfirm_Click"/>
+            <Button x:Name="editInfoConfirm" Width="50" Height="20" Content="确认" VerticalContentAlignment="Center" HorizontalContentAlignment="Center" Canvas.Left="50" Canvas.Top="135" Click="editInfoConfirm_Click"/>
             <Button x:Name="editInfoCancel" Width="50" Height="20" Content="取消" VerticalContentAlignment="Center" HorizontalContentAlignment="Center" Canvas.Left="120" Canvas.Top="135" Click="editInfoCancel_Click"/>
         </Canvas>
         <Canvas x:Name="userInfoCanvas" Margin="5,5,580,400" Visibility="Hidden">
@@ -63,6 +63,30 @@
         </Canvas>
         <Line Stroke="Black" StrokeDashArray="5" StrokeThickness="1" X1="215" Y1="0" X2="215" Y2="570"/>
         <Line Stroke="Black" StrokeDashArray="5" StrokeThickness="1" X1="0" Y1="170" X2="215" Y2="170"/>
-        <ListBox x:Name="onlineFriendList" HorizontalAlignment="Left" Height="370" Margin="6,180,0,0" VerticalAlignment="Top" Width="200"/>
+        <Canvas x:Name="friendListCanvas" Margin="5,170,585,5" Visibility="Visible">
+            <Label x:Name="friendListName" Content="在线好友：" Canvas.Top="5" Foreground="Gray"/>
+            <ListBox x:Name="onlineFriendlistListBox" Height="350" Width="200" Canvas.Left="0" Canvas.Top="35" VerticalAlignment="Top" HorizontalAlignment="Left" IsEnabled="False">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="150"></ColumnDefinition>
+                                <ColumnDefinition Width="30"></ColumnDefinition>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column ="0" Text="{Binding Path=nameAndId}" TextAlignment="left"/>
+                            <TextBlock Grid.Column="1" Text="{Binding Path=msgNumString}" TextAlignment="Right"/>
+                        </Grid>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </Canvas>
+        <Line Stroke="Black" StrokeDashArray="5" StrokeThickness="1" X1="215" Y1="380" X2="795" Y2="380"/>
+        <Canvas x:Name="sendMsgCanvas" Margin="215, 380, 5,5">
+            <TextBox x:Name="inputTextBox" Height="130" Width="553" Canvas.Left="10" Canvas.Top="10" IsEnabled="False"/>
+            <TextBox x:Name="fileTextBox" Height="25" Width="375" Canvas.Left="10" Canvas.Top="150" IsReadOnly="True" IsEnabled="False"/>
+            <Button x:Name="chooseFile" Content="选择文件" Width="60" Height="25" Canvas.Left="390" Canvas.Top="150" IsEnabled="False"/>
+            <Button x:Name="sendFile" Content="发送文件" Width="60" Height="25" Canvas.Left="455" Canvas.Top="150" IsEnabled="False"/>
+            <Button x:Name="sendMsg" Content="发送" Width="43" Height="25" Canvas.Left="520" Canvas.Top="150" IsEnabled="False"/>
+        </Canvas>
     </Grid>
 </Window>

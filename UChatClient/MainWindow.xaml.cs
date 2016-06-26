@@ -1,6 +1,7 @@
 ﻿using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -78,7 +79,7 @@ namespace UChatClient
         private Socket socketClient = null;
 
         // 用于保存在线的好友列表
-        private List<string> friendList;
+        private ObservableCollection<onlineFriendType> onlineFriendlist;
 
         #endregion
 
@@ -91,6 +92,9 @@ namespace UChatClient
             InitializeComponent();
 
             flagLogin = false;
+
+            onlineFriendlist = new ObservableCollection<onlineFriendType>();
+            onlineFriendlistListBox.ItemsSource = onlineFriendlist;
 
             //获得文本框中的IP地址对象
             IPAddress address = IPAddress.Parse(ipAddr);
@@ -257,6 +261,51 @@ namespace UChatClient
                     {
                         MessageBox.Show("更新信息失败！");
                     }
+                    else if (arrMsg[0] == UPDATE_FRIENDLIST)
+                    {
+                        FriendlistHandler friendlistHandler = (FriendlistHandler)JsonConvert.DeserializeObject(msgReceive.Substring(1, msgReceive.Length - 1), typeof(FriendlistHandler));
+                        if (friendlistHandler.type == ADD_ONLINE_FRIEND)
+                        {
+                            bool flag = true;
+                            foreach (onlineFriendType oFT in onlineFriendlist)
+                            {
+                                if (oFT.userData.userId != null && oFT.userData.userId.Equals(friendlistHandler.friendInfo.userId))
+                                {
+                                    flag = false;
+                                }      
+                            }
+                            if (flag)
+                            {
+                                onlineFriendType newFriend = new onlineFriendType(friendlistHandler.friendInfo);
+                                try
+                                {
+                                    Application.Current.Dispatcher.Invoke(new Action(delegate { onlineFriendlist.Add(newFriend); }));
+                                }
+                                catch (Exception e)
+                                {
+                                    MessageBox.Show(e.Message);
+                                }
+                            }
+                        }
+                        else if (friendlistHandler.type == REMOVE_ONLINE_FRIEND)
+                        {
+                            foreach (onlineFriendType oFT in onlineFriendlist)
+                            {
+                                if (oFT.userData.userId != null && oFT.userData.userId.Equals(friendlistHandler.friendInfo.userId))
+                                {
+                                    try
+                                    {
+                                        Application.Current.Dispatcher.Invoke(new Action(delegate { onlineFriendlist.Remove(oFT); }));
+                                        break;
+                                    }
+                                    catch (Exception e)
+                                    {
+                                        MessageBox.Show(e.Message);
+                                    }
+                                }
+                            }
+                        }
+                    }
                     else
                     {
                         MessageBox.Show(Encoding.UTF8.GetString(arrMsg));
@@ -264,12 +313,12 @@ namespace UChatClient
                 }
                 catch (SocketException se)
                 {
-                    Console.WriteLine("【错误】接收消息异常：" + se.Message);
+                    MessageBox.Show("【错误】接收消息异常：" + se.Message);
                     return;
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine("【错误】接收消息异常：" + e.Message);
+                    MessageBox.Show("【错误】接收消息异常：" + e.Message);
                     return;
                 }
             }
@@ -296,7 +345,17 @@ namespace UChatClient
             userGender.Content = userData.userGender;
             userAge.Content = userData.userAge;
 
+            friendListName.Foreground = new SolidColorBrush(Colors.Black);
+            inputTextBox.IsEnabled = true;
+            fileTextBox.IsEnabled = true;
+            chooseFile.IsEnabled = true;
+            sendFile.IsEnabled = true;
+            sendMsg.IsEnabled = true;
+            onlineFriendlistListBox.IsEnabled = true;
 
+            onlineFriendType All = new onlineFriendType("所有人");            
+            onlineFriendlist.Add(All);
+            
         }
         #endregion
 
@@ -362,16 +421,15 @@ namespace UChatClient
             }
             catch (SocketException se)
             {
-                Console.WriteLine("【错误】发送消息异常：" + se.Message);
+               MessageBox.Show("【错误】发送消息异常：" + se.Message);
                 return;
             }
             catch (Exception ex)
             {
-                Console.WriteLine("【错误】发送消息异常：" + ex.Message);
+                MessageBox.Show("【错误】发送消息异常：" + ex.Message);
                 return;
             }
 
-            // 客户端断开连接
             socketClient.Close();
             threadClient.Abort();
 
@@ -462,6 +520,7 @@ namespace UChatClient
         /// <param name="e"></param>
         private void userInfoEdit_TextChanged(object sender, TextChangedEventArgs e)
         {
+            // 修改信息
             // 密码
             if (userPasswordEdit.Text.Length > 15)
                 userPasswordEdit.Text = userPasswordEdit.Text.Substring(0, 15);
@@ -482,6 +541,27 @@ namespace UChatClient
                 userAgeEdit.Text = userAgeEdit.Text.Substring(0, 2);
 
             userAgeEdit.Select(userAgeEdit.Text.Length, 0);
+
+            // 注册
+            // 密码
+            if (userPasswordRegister.Text.Length > 15)
+                userPasswordRegister.Text = userPasswordRegister.Text.Substring(0, 15);
+            userPasswordRegister.Select(userPasswordRegister.Text.Length, 0);
+            
+            // 用户名
+            if (userNameRegister.Text.Length > 15)
+                userNameRegister.Text = userNameRegister.Text.Substring(0, 15);
+            userNameRegister.Select(userNameRegister.Text.Length, 0);
+
+            // 年龄
+            for (int i = 0; i < userAgeRegister.Text.Length; i++)
+                if (userAgeRegister.Text[i] < '0' || userAgeRegister.Text[i] > '9')
+                    userAgeRegister.Text = "";
+
+            if (userAgeRegister.Text.Length > 2)
+                userAgeRegister.Text = userAgeRegister.Text.Substring(0, 2);
+
+            userAgeRegister.Select(userAgeRegister.Text.Length, 0);
 
         }
         #endregion
@@ -575,12 +655,56 @@ namespace UChatClient
             userGenderRegister.Text = "";
             userAgeRegister.Text = "";
 
+            accountTextBox.Text = "";
+            passwordTextBox.Password = "";
+
             userRegisterCanvas.Visibility = Visibility.Hidden;
             userLoginCanvas.Visibility = Visibility.Visible;
         }
         #endregion
 
     }
+
+    #region ----------  显示好友列表的信息  ----------
+    /// <summary>
+    ///     显示好友列表的信息
+    /// </summary>
+    public class onlineFriendType
+    {
+        public string nameAndId { get; set; }
+        public int msgNum { get; set; }
+        public string msgNumString { get; set; }
+        public UserData userData;
+
+        public onlineFriendType(UserData ud)
+        {
+            nameAndId = ud.userName + "(" + ud.userId + ")";
+            msgNum = 0;
+            msgNumString = "";
+            userData = ud;
+        }
+
+        public onlineFriendType(string nAI)
+        {
+            nameAndId = nAI;
+            msgNum = 0;
+            msgNumString = "";
+            userData = new UserData();
+        }
+
+        public void resetNum()
+        {
+            msgNum = 0;
+            msgNumString = "";
+        }
+
+        public void increaseNum()
+        {
+            msgNum++;
+            msgNumString = Convert.ToString(msgNum);
+        }
+    }
+    #endregion
 
     #region -------- 用于解析数据的结构体 --------
     /// <summary>

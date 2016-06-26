@@ -13,7 +13,6 @@ namespace UChatServer
     {
         // 数据库连接
         private SqlConnection con;
-        private SqlCommand com;
 
         public DatabaseHandler()
         {
@@ -39,7 +38,7 @@ namespace UChatServer
             Random rnd = new Random();
 
             // 初始化查询语句
-            com = new SqlCommand();
+            SqlCommand com = new SqlCommand();
             com.Connection = con;
             com.CommandType = CommandType.Text;
 
@@ -81,7 +80,7 @@ namespace UChatServer
             userData = new UserData();
 
             // 初始化查询语句
-            com = new SqlCommand();
+            SqlCommand com = new SqlCommand();
             com.Connection = con;
             com.CommandType = CommandType.Text;
             com.CommandText = "select id, code, name, gender, age from UserInfo where id = '" + userId + "'";
@@ -121,20 +120,27 @@ namespace UChatServer
         /// <returns></returns>
         public bool Register(string userId, string userName, string userPassword, string userGender, int userAge)
         {
-            if (userGender == null || userGender == "")
-                userGender = "男";
+            try
+            {
+                if (userGender == null || userGender == "")
+                    userGender = "男";
 
-            // 初始化查询语句
-            com = new SqlCommand();
-            com.Connection = con;
-            com.CommandType = CommandType.Text;
-            com.CommandText = "insert into UserInfo(id, name, code, gender, age) values ('" + userId + "', '" + userName + "', '" + userPassword + "', '" + userGender + "', '" + userAge +"')";
+                // 初始化查询语句
+                SqlCommand com = new SqlCommand();
+                com.Connection = con;
+                com.CommandType = CommandType.Text;
+                com.CommandText = "insert into UserInfo(id, name, code, gender, age) values ('" + userId + "', '" + userName + "', '" + userPassword + "', '" + userGender + "', '" + userAge + "')";
 
-            com.ExecuteNonQuery();
+                com.ExecuteNonQuery();
 
-            Console.WriteLine("新用户\"{0}:{1}:{2}:{3}:{4}\"注册成功", userId, userName, userPassword, userGender, userAge);
+                Console.WriteLine("新用户\"{0}:{1}:{2}:{3}:{4}\"注册成功", userId, userName, userPassword, userGender, userAge);
 
-            return false;
+                return true;
+            }
+            catch (Exception e)
+            {
+                return false;
+            }
         }
         #endregion
 
@@ -147,7 +153,7 @@ namespace UChatServer
         public UserData QueryUserData(string queryUserId)
         {
             // 初始化查询语句
-            com = new SqlCommand();
+            SqlCommand com = new SqlCommand();
             com.Connection = con;
             com.CommandType = CommandType.Text;
             com.CommandText = "select id, name, gender, age from UserInfo where id = '" + queryUserId + "'";
@@ -178,7 +184,7 @@ namespace UChatServer
             List<UserData> ans = new List<UserData>();
 
             // 初始化查询语句
-            com = new SqlCommand();
+            SqlCommand com = new SqlCommand();
             com.Connection = con;
             com.CommandType = CommandType.Text;
             com.CommandText = "select id, name, gender, age from Friendship, UserInfo where idA = '" + userId + "' and id = idB";
@@ -207,6 +213,37 @@ namespace UChatServer
             res.Close();
 
             return ans;
+        }
+        #endregion
+
+        #region ----------    更新用户信息    ----------
+        /// <summary>
+        ///     更新用户信息
+        /// </summary>
+        /// <param name="registerHandler">用户更新的信息</param>
+        /// <returns>更新是否成功</returns>
+        public bool UpdateUserInfo(RegisterHandler registerHandler)
+        {
+            try
+            {
+
+                // 初始化查询语句
+                SqlCommand com = new SqlCommand();
+                com.Connection = con;
+                com.CommandType = CommandType.Text;
+                com.CommandText = "update UserInfo set name='" + registerHandler.userName 
+                                                    + "', code = '" + registerHandler.userPassword
+                                                    + "', gender = '" + registerHandler.userGender
+                                                    + "', age = '" + registerHandler.userAge 
+                                                    + "' where id = '" + registerHandler.userId + "'";
+                com.ExecuteNonQuery();
+
+                return true;
+            }
+            catch (Exception e)
+            {
+                return false;
+            }
         }
         #endregion
     }

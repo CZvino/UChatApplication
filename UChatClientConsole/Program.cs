@@ -11,7 +11,9 @@ namespace UChatClientConsole
         static void Main(string[] args)
         {
             string user = Console.ReadLine();
-            string password = Console.ReadLine();
+            Console.Write(user.Length);
+            Console.ReadKey();
+            /*string password = Console.ReadLine();
             UChatClientConsole u = new UChatClientConsole(user, password);
             u.StartClient();
             u.Login();
@@ -19,7 +21,7 @@ namespace UChatClientConsole
             {
                 string tmp = Console.ReadLine();
                 u.SendMsg(tmp);
-            }
+            }*/
         }
     }
 }

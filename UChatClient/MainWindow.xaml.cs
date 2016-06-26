@@ -36,6 +36,10 @@ namespace UChatClient
         private const byte IS_NOT_LOGIN = 3;
         private const byte IS_REGISTER = 4;
         private const byte IS_NOT_REGISTER = 5;
+        private const byte UPDATE_USER_INFO = 6;
+        private const byte IS_UPDATE = 7;
+        private const byte IS_NOT_UPDATE = 8;
+        private const byte DISCONNECT = 9;
 
         // 用户发送给单个用户 相关
         private const byte INDIVIDUAL_LOWER_BOUND = 10;
@@ -58,6 +62,7 @@ namespace UChatClient
         // 在线好友列表状态字
         private const int ADD_ONLINE_FRIEND = 0;
         private const int REMOVE_ONLINE_FRIEND = 1;
+
         #endregion
 
         private const string ipAddr = "127.0.0.1";  //连接ip
@@ -65,6 +70,7 @@ namespace UChatClient
 
         private bool flagLogin;
         private UserData userData;
+        private string password;
 
         // 客户端负责接收服务端发来的数据消息的线程
         private Thread threadClient = null;
@@ -153,7 +159,7 @@ namespace UChatClient
         /// <param name="e"></param>
         private void Login_Click(object sender, RoutedEventArgs e)
         {
-
+            password = passwordTextBox.Password;
             LoginHandler loginHandler = new LoginHandler(accountTextBox.Text, passwordTextBox.Password);
 
             string msgPackage = JsonConvert.SerializeObject(loginHandler);
@@ -231,16 +237,29 @@ namespace UChatClient
                             this.passwordTextBox.Password = "";
                         }));
                     }
-                    else if (arrMsg[0] == MSG_TO_ALL || arrMsg[0] == MSG_TO_INDIVIDULAL)
+                    else if (arrMsg[0] == IS_REGISTER)
                     {
-                        // 普通消息
-                        MsgHandler msgHandler = (MsgHandler)JsonConvert.DeserializeObject(msgReceive.Substring(1, msgReceive.Length - 1), typeof(MsgHandler));
-                        Console.WriteLine("{0} : {1}", msgHandler.from, msgHandler.message);
+                        UserData userdata = (UserData)JsonConvert.DeserializeObject(msgReceive.Substring(1, msgReceive.Length - 1), typeof(UserData));
+
+                        Application.Current.Dispatcher.Invoke(new Action(delegate { RegisterSuccess(userdata);}));
                     }
-                    // 文件
-                    else if (arrMsg[0] / 4 == 1)
+                    else if (arrMsg[0] == IS_NOT_REGISTER)
                     {
-                        // TODO: 保存文件
+                        MessageBox.Show("注册失败!");
+                    }
+                    else if (arrMsg[0] == IS_UPDATE)
+                    {
+                        userData = (UserData)JsonConvert.DeserializeObject(msgReceive.Substring(1, msgReceive.Length - 1), typeof(UserData));
+
+                        Application.Current.Dispatcher.Invoke(new Action(delegate { UpdateInfoSuccess(); }));
+                    }
+                    else if (arrMsg[0] == IS_NOT_UPDATE)
+                    {
+                        MessageBox.Show("更新信息失败！");
+                    }
+                    else
+                    {
+                        MessageBox.Show(Encoding.UTF8.GetString(arrMsg));
                     }
                 }
                 catch (SocketException se)
@@ -265,120 +284,302 @@ namespace UChatClient
         {
             flagLogin = true;
 
-            userInfoCanvas.Children.Remove(accountLabel);
-            userInfoCanvas.UnregisterName("accountLabel");
-            userInfoCanvas.Children.Remove(accountTextBox);
-            userInfoCanvas.UnregisterName("accountTextBox");
-            userInfoCanvas.Children.Remove(passwordLabel);
-            userInfoCanvas.UnregisterName("passwordLabel");
-            userInfoCanvas.Children.Remove(passwordTextBox);
-            userInfoCanvas.UnregisterName("passwordTextBox");
-            userInfoCanvas.Children.Remove(Login);
-            userInfoCanvas.UnregisterName("Login");
-            userInfoCanvas.Children.Remove(Register);
-            userInfoCanvas.UnregisterName("Register");
+            mainWindow.Title = "U信 - " + userData.userName + "(" + userData.userId + ")";
 
-            Label userIdTag = new Label();
-            {
-                userIdTag.Width = 60;
-                userIdTag.Height = 25;
-                userIdTag.Content = "账   号：";
-                userIdTag.VerticalContentAlignment = VerticalAlignment.Center;
-                userIdTag.HorizontalContentAlignment = HorizontalAlignment.Center;
-                userIdTag.Margin = new Thickness(25, 10, 0, 0);
-            }
+            InitFriendList();
 
-            Label userId = new Label();
-            {
-                userId.Width = 100;
-                userId.Height = 25;
-                userId.Content = userData.userId;
-                userId.VerticalContentAlignment = VerticalAlignment.Center;
-                userId.HorizontalContentAlignment = HorizontalAlignment.Left;
-                userId.Margin = new Thickness(90, 10, 0, 0);
-            }
+            userLoginCanvas.Visibility = Visibility.Hidden;
+            userInfoCanvas.Visibility = Visibility.Visible;
 
-            Label userNameTag = new Label();
-            {
-                userNameTag.Width = 60;
-                userNameTag.Height = 25;
-                userNameTag.Content = "用户名：";
-                userNameTag.VerticalContentAlignment = VerticalAlignment.Center;
-                userNameTag.HorizontalContentAlignment = HorizontalAlignment.Center;
-                userNameTag.Margin = new Thickness(25, 40, 0, 0);
-            }
+            userId.Content = userData.userId;
+            userName.Content = userData.userName;
+            userGender.Content = userData.userGender;
+            userAge.Content = userData.userAge;
 
-            Label userName = new Label();
-            {
-                userName.Width = 100;
-                userName.Height = 25;
-                userName.Content = userData.userName;
-                userName.VerticalContentAlignment = VerticalAlignment.Center;
-                userName.HorizontalContentAlignment = HorizontalAlignment.Left;
-                userName.Margin = new Thickness(90, 40, 0, 0);
-            }
 
-            Label userGenderTag = new Label();
-            {
-                userGenderTag.Width = 60;
-                userGenderTag.Height = 25;
-                userGenderTag.Content = "性   别：";
-                userGenderTag.VerticalContentAlignment = VerticalAlignment.Center;
-                userGenderTag.HorizontalContentAlignment = HorizontalAlignment.Center;
-                userGenderTag.Margin = new Thickness(25, 70, 0, 0);
-            }
-
-            Label userGender = new Label();
-            {
-                userGender.Width = 100;
-                userGender.Height = 25;
-                userGender.Content = userData.userGender;
-                userGender.VerticalContentAlignment = VerticalAlignment.Center;
-                userGender.HorizontalContentAlignment = HorizontalAlignment.Left;
-                userGender.Margin = new Thickness(90, 70, 0, 0);
-            }
-
-            Label userAgeTag = new Label();
-            {
-                userAgeTag.Width = 60;
-                userAgeTag.Height = 25;
-                userAgeTag.Content = "年   龄：";
-                userAgeTag.VerticalContentAlignment = VerticalAlignment.Center;
-                userAgeTag.HorizontalContentAlignment = HorizontalAlignment.Center;
-                userAgeTag.Margin = new Thickness(25, 100, 0, 0);
-            }
-
-            Label userAge = new Label();
-            {
-                userAge.Width = 100;
-                userAge.Height = 25;
-                userAge.Content = userData.userAge;
-                userAge.VerticalContentAlignment = VerticalAlignment.Center;
-                userAge.HorizontalContentAlignment = HorizontalAlignment.Left;
-                userAge.Margin = new Thickness(90, 100, 0, 0);
-            }
-
-            Button editInfo = new Button();
-            {
-                editInfo.Width = 50;
-                editInfo.Height = 20;
-                editInfo.Content = "编辑";
-                editInfo.VerticalContentAlignment = VerticalAlignment.Center;
-                editInfo.HorizontalContentAlignment = HorizontalAlignment.Center;
-                editInfo.Margin = new Thickness(150, 130, 0, 0);
-            }
-
-            userInfoCanvas.Children.Add(userIdTag);
-            userInfoCanvas.Children.Add(userId);
-            userInfoCanvas.Children.Add(userNameTag);
-            userInfoCanvas.Children.Add(userName);
-            userInfoCanvas.Children.Add(userGenderTag);
-            userInfoCanvas.Children.Add(userGender);
-            userInfoCanvas.Children.Add(userAgeTag);
-            userInfoCanvas.Children.Add(userAge);
-            userInfoCanvas.Children.Add(editInfo);
         }
         #endregion
+
+        #region ------  更新信息成功，更新本地信息  ------
+        /// <summary>
+        ///     更新信息成功，更新本地信息
+        /// </summary>
+        private void UpdateInfoSuccess()
+        {
+            mainWindow.Title = "U信 - " + userData.userName + "(" + userData.userId + ")";
+
+            userId.Content = userData.userId;
+            userName.Content = userData.userName;
+            userGender.Content = userData.userGender;
+            userAge.Content = userData.userAge;
+
+            userEditInfoCanvas.Visibility = Visibility.Hidden;
+            userInfoCanvas.Visibility = Visibility.Visible;
+        }
+        #endregion
+
+        #region ----------    初始化好友列表    ----------
+        /// <summary>
+        ///     初始化好友列表
+        /// </summary>
+        private void InitFriendList()
+        {
+            // 向服务器发送断开连接申请
+            byte[] sendArrMsg = new byte[1];
+            sendArrMsg[0] = INIT_FRIENDLIST;
+
+            try
+            {
+                socketClient.Send(sendArrMsg);
+            }
+            catch (SocketException se)
+            {
+                Console.WriteLine("【错误】发送消息异常：" + se.Message);
+                return;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("【错误】发送消息异常：" + ex.Message);
+                return;
+            }
+        }
+        #endregion
+
+        #region ----------     重载关闭方法     ----------
+        /// <summary>
+        ///     重载关闭方法，增加断开连接的步骤
+        /// </summary>
+        /// <param name="e"></param>
+        protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+        {
+            // 向服务器发送断开连接申请
+            byte[] sendArrMsg = new byte[1];
+            sendArrMsg[0] = DISCONNECT;
+
+            try
+            {
+                socketClient.Send(sendArrMsg);
+            }
+            catch (SocketException se)
+            {
+                Console.WriteLine("【错误】发送消息异常：" + se.Message);
+                return;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("【错误】发送消息异常：" + ex.Message);
+                return;
+            }
+
+            // 客户端断开连接
+            socketClient.Close();
+            threadClient.Abort();
+
+            // 关闭
+            base.OnClosing(e);
+        }
+        #endregion
+
+        #region ----------   修改用户个人信息   ----------
+        /// <summary>
+        ///     修改用户个人信息
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void editInfo_Click(object sender, RoutedEventArgs e)
+        {
+            mainWindow.Title = "U信 - 修改信息";
+
+            userIdEdit.Content = userData.userId;
+            userNameEdit.Text = userData.userName;
+            userPasswordEdit.Text = password;
+            if (userData.userGender.Trim().Equals("男"))
+                userGenderEdit.SelectedItem = male;
+            else
+                userGenderEdit.SelectedItem = female;
+            userAgeEdit.Text = Convert.ToString(userData.userAge);
+            userInfoCanvas.Visibility = Visibility.Hidden;
+            userEditInfoCanvas.Visibility = Visibility.Visible;
+        }
+        #endregion
+
+        #region ----------       确认修改       ----------
+        /// <summary>
+        ///     确认修改
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void editInfoConfirm_Click(object sender, RoutedEventArgs e)
+        {
+            // 修改信息
+            RegisterHandler updateHandler = new RegisterHandler((string)userIdEdit.Content, userNameEdit.Text, userPasswordEdit.Text, userGenderEdit.Text, Convert.ToInt32(userAgeEdit.Text));
+            string updateMsg = JsonConvert.SerializeObject(updateHandler);
+
+            byte[] arrMsg = Encoding.UTF8.GetBytes(updateMsg);
+            byte[] sendArrMsg = new byte[arrMsg.Length + 1];
+
+            // 设置标志位，代表更新用户信息
+            sendArrMsg[0] = UPDATE_USER_INFO;
+            Buffer.BlockCopy(arrMsg, 0, sendArrMsg, 1, arrMsg.Length);
+
+            try
+            {
+                socketClient.Send(sendArrMsg);
+            }
+            catch (SocketException se)
+            {
+                Console.WriteLine("【错误】发送消息异常：" + se.Message);
+                return;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("【错误】发送消息异常：" + ex.Message);
+                return;
+            }
+        }
+        #endregion
+
+        #region ----------       取消修改       ----------
+        /// <summary>
+        ///     撤销修改
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void editInfoCancel_Click(object sender, RoutedEventArgs e)
+        {
+            mainWindow.Title = "U信 - " + userData.userName + "(" + userData.userId + ")";
+
+            userInfoCanvas.Visibility = Visibility.Visible;
+            userEditInfoCanvas.Visibility = Visibility.Hidden;
+        }
+        #endregion
+
+        #region ----------     信息格式检查     ----------
+        /// <summary>
+        ///     密码不能多于15位、年龄为大于0小于100的整数，用户名的长度不能超过15位
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void userInfoEdit_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            // 密码
+            if (userPasswordEdit.Text.Length > 15)
+                userPasswordEdit.Text = userPasswordEdit.Text.Substring(0, 15);
+            userPasswordEdit.Select(userPasswordEdit.Text.Length, 0);
+
+
+            // 用户名
+            if (userNameEdit.Text.Length > 15)
+                userNameEdit.Text = userNameEdit.Text.Substring(0, 15);
+            userNameEdit.Select(userNameEdit.Text.Length, 0);
+
+            // 年龄
+            for (int i = 0; i < userAgeEdit.Text.Length; i++)
+                if (userAgeEdit.Text[i] < '0' || userAgeEdit.Text[i] > '9')
+                    userAgeEdit.Text = "";
+
+            if (userAgeEdit.Text.Length > 2)
+                userAgeEdit.Text = userAgeEdit.Text.Substring(0, 2);
+
+            userAgeEdit.Select(userAgeEdit.Text.Length, 0);
+
+        }
+        #endregion
+
+        #region ----------  注册及相关按钮响应  ----------
+        /// <summary>
+        ///     注册按钮响应
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void Register_Click(object sender, RoutedEventArgs e)
+        {
+            mainWindow.Title = "U信 - 注册";
+
+            userRegisterCanvas.Visibility = Visibility.Visible;
+            userLoginCanvas.Visibility = Visibility.Hidden;
+        }
+
+        /// <summary>
+        ///     确认注册
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void registerConfirm_Click(object sender, RoutedEventArgs e)
+        {
+            // 注册信息
+            if (userNameRegister.Text.Equals(""))
+                MessageBox.Show("用户名不得为空！");
+            else if (userPasswordRegister.Text.Equals(""))
+                MessageBox.Show("密码不得为空！");
+            else
+            {
+                string gender = userGenderRegister.Text.Equals("") ? "男" : userGenderRegister.Text;
+                int age = userAgeRegister.Text.Equals("") ? 0 : Convert.ToInt32(userAgeRegister.Text);
+
+                RegisterHandler registerHandler = new RegisterHandler("", userNameRegister.Text, userPasswordRegister.Text, gender, age);
+                string updateMsg = JsonConvert.SerializeObject(registerHandler);
+
+                byte[] arrMsg = Encoding.UTF8.GetBytes(updateMsg);
+                byte[] sendArrMsg = new byte[arrMsg.Length + 1];
+
+                // 设置标志位，代表更新用户信息
+                sendArrMsg[0] = REGISTER;
+                Buffer.BlockCopy(arrMsg, 0, sendArrMsg, 1, arrMsg.Length);
+
+                try
+                {
+                    socketClient.Send(sendArrMsg);
+                }
+                catch (SocketException se)
+                {
+                    Console.WriteLine("【错误】发送消息异常：" + se.Message);
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("【错误】发送消息异常：" + ex.Message);
+                    return;
+                }
+            }
+            
+        }
+
+        /// <summary>
+        ///     取消注册
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void registerCancel_Click(object sender, RoutedEventArgs e)
+        {
+            mainWindow.Title = "U信 - 登录";
+
+            userNameRegister.Text = "";
+            userPasswordRegister.Text = "";
+            userGenderRegister.Text = "";
+            userAgeRegister.Text = "";
+
+            accountTextBox.Text = "";
+            passwordTextBox.Password = "";
+            userRegisterCanvas.Visibility = Visibility.Hidden;
+            userLoginCanvas.Visibility = Visibility.Visible;
+        }
+        #endregion
+
+        #region ----------       注册成功       ----------
+        private void RegisterSuccess(UserData userdata)
+        {
+            MessageBox.Show("注册成功！\r\n您的账号为：" + userdata.userId + "\r\n您的密码为："+ userPasswordRegister.Text);
+            userNameRegister.Text = "";
+            userPasswordRegister.Text = "";
+            userGenderRegister.Text = "";
+            userAgeRegister.Text = "";
+
+            userRegisterCanvas.Visibility = Visibility.Hidden;
+            userLoginCanvas.Visibility = Visibility.Visible;
+        }
+        #endregion
+
     }
 
     #region -------- 用于解析数据的结构体 --------

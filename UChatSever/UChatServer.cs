@@ -45,7 +45,9 @@ namespace UChatServer
 
         // 增删好友状态字
         private const byte ADD_FRIEND = 40;
-        private const byte SUB_FRIEND = 41;
+        private const byte REMOVE_FRIEND = 41;
+        private const byte IS_EDIT_FRIEND = 42;
+        private const byte IS_NOT_EDIT_FRIEND = 43;
 
         // 在线好友列表状态字
         private const int ADD_ONLINE_FRIEND = 0;
@@ -393,6 +395,12 @@ namespace UChatServer
                     string sendMsg = Encoding.UTF8.GetString(msgReceiver, 0, length);
                     SendMsgToAll(sendMsg);
                 }
+                else if (msgReceiver[0] == ADD_FRIEND || msgReceiver[0] == REMOVE_FRIEND)
+                {
+                    string userId = dictOnlineUser[socketClient.RemoteEndPoint.ToString()];
+                    string friendId = Encoding.UTF8.GetString(msgReceiver, 1, length-1);
+                    EditFriendOfSomeone(msgReceiver[0], userId, friendId);
+                }
                 // 断开连接
                 else if (msgReceiver[0] == DISCONNECT)
                 {
@@ -657,6 +665,155 @@ namespace UChatServer
         }
         #endregion
 
+        private void EditFriendOfSomeone(byte flag, string userId, string friendId)
+        {
+            string socketKey = dictOnlineUserO[userId];
+            if (flag == ADD_FRIEND)
+            {
+                if (dictDatabaseHandler[socketKey].AddFriend(userId, friendId) == true)
+                {
+                    byte[] arrMsg = new byte[1];
+                    arrMsg[0] = IS_EDIT_FRIEND;
+                    try
+                    {
+                        dictSocket[socketKey].Send(arrMsg);
+                    }
+                    catch (SocketException se)
+                    {
+                        Console.WriteLine("【错误】" + se.Message);
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine("【错误】" + e.Message);
+                    }
+                    Thread.Sleep(200);
+
+                    if (dictOnlineUserO.ContainsKey(friendId))
+                    {
+                        string friendSocketKey = dictOnlineUserO[friendId];
+                        UserData friendData = dictDatabaseHandler[socketKey].QueryUserData(friendId);
+                        UserData userData = dictDatabaseHandler[socketKey].QueryUserData(userId);
+
+                        string friendMsg = JsonConvert.SerializeObject(new FriendlistHandler(ADD_ONLINE_FRIEND, friendData));
+                        byte[] friendMsgByte = Encoding.UTF8.GetBytes(friendMsg);
+                        byte[] friendMsgByteSend = new byte[friendMsgByte.Length + 1];
+                        friendMsgByteSend[0] = UPDATE_FRIENDLIST;
+                        Buffer.BlockCopy(friendMsgByte, 0, friendMsgByteSend, 1, friendMsgByte.Length);
+
+                        string userMsg = JsonConvert.SerializeObject(new FriendlistHandler(ADD_ONLINE_FRIEND, userData));
+                        byte[] userMsgByte = Encoding.UTF8.GetBytes(userMsg);
+                        byte[] userMsgByteSend = new byte[userMsgByte.Length + 1];
+                        userMsgByteSend[0] = UPDATE_FRIENDLIST;
+                        Buffer.BlockCopy(userMsgByte, 0, userMsgByteSend, 1, userMsgByte.Length);
+
+                        Console.WriteLine("{0} : {1}", friendSocketKey, Encoding.UTF8.GetString(friendMsgByte));
+                        Console.WriteLine("{0} : {1}", socketKey, Encoding.UTF8.GetString(userMsgByte));
+                        try
+                        {
+                            dictSocket[friendSocketKey].Send(userMsgByteSend);
+                            dictSocket[socketKey].Send(friendMsgByteSend);
+                        }
+                        catch (SocketException se)
+                        {
+                            Console.WriteLine("【错误】" + se.Message);
+                        }
+                        catch (Exception e)
+                        {
+                            Console.WriteLine("【错误】" + e.Message);
+                        }
+                    }
+
+                }
+                else
+                {
+                    byte[] arrMsg = new byte[1];
+                    arrMsg[0] = IS_NOT_EDIT_FRIEND;
+                    try
+                    {
+                        dictSocket[socketKey].Send(arrMsg);
+                    }
+                    catch (SocketException se)
+                    {
+                        Console.WriteLine("【错误】" + se.Message);
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine("【错误】" + e.Message);
+                    }
+                }
+            }
+            else if (flag == REMOVE_FRIEND)
+            {
+                if (dictDatabaseHandler[dictOnlineUserO[userId]].RemoveFriend(userId, friendId) == true)
+                {
+                    byte[] arrMsg = new byte[1];
+                    arrMsg[0] = IS_EDIT_FRIEND;
+                    try
+                    {
+                        dictSocket[socketKey].Send(arrMsg);
+                    }
+                    catch (SocketException se)
+                    {
+                        Console.WriteLine("【错误】" + se.Message);
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine("【错误】" + e.Message);
+                    }
+                    Thread.Sleep(200);
+
+                    if (dictOnlineUserO.ContainsKey(friendId))
+                    {
+                        string friendSocketKey = dictOnlineUserO[friendId];
+                        UserData friendData = dictDatabaseHandler[socketKey].QueryUserData(friendId);
+                        UserData userData = dictDatabaseHandler[socketKey].QueryUserData(userId);
+
+                        string friendMsg = JsonConvert.SerializeObject(new FriendlistHandler(REMOVE_ONLINE_FRIEND, friendData));
+                        byte[] friendMsgByte = Encoding.UTF8.GetBytes(friendMsg);
+                        byte[] friendMsgByteSend = new byte[friendMsgByte.Length + 1];
+                        friendMsgByteSend[0] = UPDATE_FRIENDLIST;
+                        Buffer.BlockCopy(friendMsgByte, 0, friendMsgByteSend, 1, friendMsgByte.Length);
+
+                        string userMsg = JsonConvert.SerializeObject(new FriendlistHandler(REMOVE_ONLINE_FRIEND, userData));
+                        byte[] userMsgByte = Encoding.UTF8.GetBytes(userMsg);
+                        byte[] userMsgByteSend = new byte[userMsgByte.Length + 1];
+                        userMsgByteSend[0] = UPDATE_FRIENDLIST;
+                        Buffer.BlockCopy(userMsgByte, 0, userMsgByteSend, 1, userMsgByte.Length);
+
+                        try
+                        {
+                            dictSocket[friendSocketKey].Send(userMsgByteSend);
+                            dictSocket[socketKey].Send(friendMsgByteSend);
+                        }
+                        catch (SocketException se)
+                        {
+                            Console.WriteLine("【错误】" + se.Message);
+                        }
+                        catch (Exception e)
+                        {
+                            Console.WriteLine("【错误】" + e.Message);
+                        }
+                    }
+                }
+                else
+                {
+                    byte[] arrMsg = new byte[1];
+                    arrMsg[0] = IS_NOT_EDIT_FRIEND;
+                    try
+                    {
+                        dictSocket[socketKey].Send(arrMsg);
+                    }
+                    catch (SocketException se)
+                    {
+                        Console.WriteLine("【错误】" + se.Message);
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine("【错误】" + e.Message);
+                    }
+                }
+            }
+        }
 
         /// <summary>
         ///     更新好友列表

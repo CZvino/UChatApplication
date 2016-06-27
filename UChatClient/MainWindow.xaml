@@ -49,7 +49,7 @@
             <Label x:Name="userGender" Width = "100" Height="25" Content="" VerticalContentAlignment="Center" HorizontalContentAlignment="Left" Canvas.Left="90" Canvas.Top="70" />
             <Label x:Name="userAgeTag" Width = "60" Height="25" Content="年   龄：" VerticalContentAlignment="Center" HorizontalContentAlignment="Left" Canvas.Left="25" Canvas.Top="100" />
             <Label x:Name="userAge" Width = "100" Height="25" Content="" VerticalContentAlignment="Center" HorizontalContentAlignment="Left" Canvas.Left="90" Canvas.Top="100" />
-            <Button x:Name="editInfo" Width="50" Height="20" Content="编辑" VerticalContentAlignment="Center" HorizontalContentAlignment="Center" Canvas.Left="150" Canvas.Top="130" Click="editInfo_Click"/>
+            <Button x:Name="editInfo" Width="50" Height="20" Content="编辑" VerticalContentAlignment="Center" HorizontalContentAlignment="Center" Canvas.Left="75" Canvas.Top="130" Click="editInfo_Click"/>
         </Canvas>
         <Canvas x:Name="userLoginCanvas" Margin="5,5,580,400" Visibility="Visible">
 
@@ -65,10 +65,10 @@
         <Line Stroke="Black" StrokeDashArray="5" StrokeThickness="1" X1="215" Y1="0" X2="215" Y2="570"/>
         <Line Stroke="Black" StrokeDashArray="5" StrokeThickness="1" X1="0" Y1="170" X2="215" Y2="170"/>
         <Canvas x:Name="friendListCanvas" Margin="5,170,585,5" Visibility="Visible">
-            <Label x:Name="friendListName" Content="在线好友：" Canvas.Top="5" Foreground="Gray"/>
+            <Label x:Name="friendListName" Content="在线好友：" Canvas.Top="35" Foreground="Gray"/>
             <Button x:Name="addFriend" Content="+" Width="20" Height="20" Canvas.Left="148" Canvas.Top="7" IsEnabled="False" Click="addFriend_Click" />
             <Button x:Name="subFriend" Content="-" Width="20" Height="20" Canvas.Left="173" Canvas.Top="7" IsEnabled="False" Click="subFriend_Click" />
-            <TextBox x:Name="friendTextBox" Width="135" Height="25" Canvas.Left="0" Canvas.Top="35" IsEnabled="False" />
+            <TextBox x:Name="friendTextBox" Width="135" Height="25" Canvas.Left="0" Canvas.Top="5" VerticalContentAlignment="Center" HorizontalContentAlignment="Left" IsEnabled="False" />
             <Button x:Name="confirmFriend" Content="确认" Width="50" Height="25" Canvas.Left="145" Canvas.Top="35"  IsEnabled="False" Click="confirmFriend_Click"/>
             <ListBox x:Name="onlineFriendlistListBox" Height="320" Width="200" Canvas.Left="0" Canvas.Top="65" VerticalAlignment="Top" HorizontalAlignment="Left" IsEnabled="False" SelectionChanged="onlineFriendlistListBox_SelectionChanged">
                 <ListBox.ItemTemplate>

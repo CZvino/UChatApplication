@@ -249,5 +249,90 @@ namespace UChatServer
             }
         }
         #endregion
+        
+        #region ----------      增加好友     ----------
+        /// <summary>
+        ///     增加好友
+        /// </summary>
+        /// <param name="idA"></param>
+        /// <param name="idB"></param>
+        /// <returns></returns>
+        public bool AddFriend(string idA, string idB)
+        {
+            SqlCommand com = new SqlCommand();
+            com.Connection = con;
+            com.CommandType = CommandType.Text;
+            com.CommandText = "select * from Friendship where (idA = '" + idA +"' and idB = '" + idB + "') or (idA = '" + idB + "' and idB = '" + idA + "')";
+
+            // 获得查询结果
+            SqlDataReader ans = com.ExecuteReader();
+
+            if (ans.Read())
+            {
+                ans.Close();
+                return false;
+            }
+                
+
+            ans.Close();
+            try
+            {
+                SqlCommand comm = new SqlCommand();
+                comm.Connection = con;
+                comm.CommandType = CommandType.Text;
+                comm.CommandText = "insert into Friendship(idA, idB) values ('" + idA + "', '" + idB + "')";
+                comm.ExecuteNonQuery();
+                return true;
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.Message);
+                return false;
+            }
+        }
+        #endregion
+
+        #region ----------      删除好友     ----------
+        /// <summary>
+        ///     删除好友
+        /// </summary>
+        /// <param name="idA"></param>
+        /// <param name="idB"></param>
+        /// <returns></returns>
+        public bool RemoveFriend(string idA, string idB)
+        {
+            SqlCommand com = new SqlCommand();
+            com.Connection = con;
+            com.CommandType = CommandType.Text;
+            com.CommandText = "select * from Friendship where (idA = '" + idA + "' and idB = '" + idB + "') or (idA = '" + idB + "' and idB = '" + idA + "')";
+
+            // 获得查询结果
+            SqlDataReader ans = com.ExecuteReader();
+
+            if (ans.Read() == false)
+            {
+                ans.Close();
+                return false;
+            }
+                
+
+            ans.Close();
+
+            try
+            {
+                SqlCommand comm = new SqlCommand();
+                comm.Connection = con;
+                comm.CommandType = CommandType.Text;
+                comm.CommandText = "delete from Friendship where (idA = '" + idA + "' and idB = '" + idB + "') or (idA='" + idB + "' and idB = '" + idA + "')";
+                comm.ExecuteNonQuery();
+                return true;
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.Message);
+                return false;
+            }
+        }
+        #endregion
     }
 }

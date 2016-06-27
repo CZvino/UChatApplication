@@ -65,7 +65,9 @@ namespace UChatClient
 
         // 增删好友状态字
         private const byte ADD_FRIEND = 40;
-        private const byte SUB_FRIEND = 41;
+        private const byte REMOVE_FRIEND = 41;
+        private const byte IS_EDIT_FRIEND = 42;
+        private const byte IS_NOT_EDIT_FRIEND = 43;
 
         // 在线好友列表状态字
         private const int ADD_ONLINE_FRIEND = 0;
@@ -223,7 +225,7 @@ namespace UChatClient
                     length = socketClient.Receive(arrMsg);
 
                     // 解析字符串
-                    string msgReceive = Encoding.UTF8.GetString(arrMsg);
+                    string msgReceive = Encoding.UTF8.GetString(arrMsg, 0, length);
 
 
                     // 消息
@@ -270,6 +272,27 @@ namespace UChatClient
                     else if (arrMsg[0] == IS_NOT_UPDATE)
                     {
                         MessageBox.Show("更新信息失败！");
+                    }
+                    else if (arrMsg[0] == IS_EDIT_FRIEND)
+                    {
+                        Application.Current.Dispatcher.Invoke(new Action(delegate 
+                        {
+                           if (addFriendFlag && !subFriendFlag)
+                                MessageBox.Show("添加好友成功！");
+                           else
+                                MessageBox.Show("删除好友成功！");
+                        }));
+                        
+                    }
+                    else if (arrMsg[0] == IS_NOT_EDIT_FRIEND)
+                    {
+                        Application.Current.Dispatcher.Invoke(new Action(delegate
+                        {
+                            if (addFriendFlag && !subFriendFlag)
+                                MessageBox.Show("添加好友失败！");
+                            else
+                                MessageBox.Show("删除好友失败！");
+                        }));
                     }
                     else if (arrMsg[0] == UPDATE_FRIENDLIST)
                     {
@@ -1242,9 +1265,14 @@ namespace UChatClient
             friendTextBox.IsEnabled = true;
         }
 
+        /// <summary>
+        ///     发送增加、删除好友的请求
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
         private void confirmFriend_Click(object sender, RoutedEventArgs e)
         {
-            string userId = friendTextBox.Text;
+            string userId = friendTextBox.Text.Trim();
             if (userId == null || userId.Equals(""))
                 MessageBox.Show("请输入正确的账号！");
             else
@@ -1254,18 +1282,19 @@ namespace UChatClient
                 if (addFriendFlag && !subFriendFlag)
                     sendArrMsg[0] = ADD_FRIEND;
                 else if (!addFriendFlag && subFriendFlag)
-                    sendArrMsg[0] = SUB_FRIEND;
+                    sendArrMsg[0] = REMOVE_FRIEND;
                 else
                 {
                     MessageBox.Show("出错！");
                     return;
                 }
-                socketClient.Send(sendArrMsg);
-            }
+                Buffer.BlockCopy(arrMsg, 0, sendArrMsg, 1, arrMsg.Length);
 
-            addFriendFlag = subFriendFlag = false;
-            friendTextBox.Text = "";
-            friendTextBox.IsEnabled = false;
+                socketClient.Send(sendArrMsg);
+                friendTextBox.Text = "";
+                friendTextBox.IsEnabled = false;
+                confirmFriend.IsEnabled = false;
+            }
         }
         #endregion
     }

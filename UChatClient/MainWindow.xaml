@@ -5,6 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:UChatClient"
         mc:Ignorable="d"
+        ResizeMode="CanMinimize"
         Title="U信 - 登录" Height="600" Width="800">
     <Grid x:Name="mainGrid">
         <Canvas x:Name="userRegisterCanvas" Margin="5,5,580,400" Visibility="Hidden">
@@ -65,7 +66,11 @@
         <Line Stroke="Black" StrokeDashArray="5" StrokeThickness="1" X1="0" Y1="170" X2="215" Y2="170"/>
         <Canvas x:Name="friendListCanvas" Margin="5,170,585,5" Visibility="Visible">
             <Label x:Name="friendListName" Content="在线好友：" Canvas.Top="5" Foreground="Gray"/>
-            <ListBox x:Name="onlineFriendlistListBox" Height="350" Width="200" Canvas.Left="0" Canvas.Top="35" VerticalAlignment="Top" HorizontalAlignment="Left" IsEnabled="False">
+            <Button x:Name="addFriend" Content="+" Width="20" Height="20" Canvas.Left="148" Canvas.Top="7" IsEnabled="False" Click="addFriend_Click" />
+            <Button x:Name="subFriend" Content="-" Width="20" Height="20" Canvas.Left="173" Canvas.Top="7" IsEnabled="False" Click="subFriend_Click" />
+            <TextBox x:Name="friendTextBox" Width="135" Height="25" Canvas.Left="0" Canvas.Top="35" IsEnabled="False" />
+            <Button x:Name="confirmFriend" Content="确认" Width="50" Height="25" Canvas.Left="145" Canvas.Top="35"  IsEnabled="False" Click="confirmFriend_Click"/>
+            <ListBox x:Name="onlineFriendlistListBox" Height="320" Width="200" Canvas.Left="0" Canvas.Top="65" VerticalAlignment="Top" HorizontalAlignment="Left" IsEnabled="False" SelectionChanged="onlineFriendlistListBox_SelectionChanged">
                 <ListBox.ItemTemplate>
                     <DataTemplate>
                         <Grid>
@@ -81,12 +86,16 @@
             </ListBox>
         </Canvas>
         <Line Stroke="Black" StrokeDashArray="5" StrokeThickness="1" X1="215" Y1="380" X2="795" Y2="380"/>
+        <Canvas x:Name="chatCanvas" Margin="215,0,0,190" >
+            <Label x:Name="chatFriendName" Content="" FontSize="20" Canvas.Top="8" Canvas.Left="20" />
+            <RichTextBox x:Name="chatRichTextBox" Width="560" Height="320" Canvas.Top="50" Canvas.Left="9" IsReadOnly="True" VerticalScrollBarVisibility="Visible" IsEnabled="False" />
+        </Canvas>
         <Canvas x:Name="sendMsgCanvas" Margin="215, 380, 5,5">
-            <TextBox x:Name="inputTextBox" Height="130" Width="553" Canvas.Left="10" Canvas.Top="10" IsEnabled="False"/>
+            <TextBox x:Name="inputTextBox" Height="130" Width="553" Canvas.Left="10" Canvas.Top="10" IsEnabled="False" TextWrapping="Wrap"/>
             <TextBox x:Name="fileTextBox" Height="25" Width="375" Canvas.Left="10" Canvas.Top="150" IsReadOnly="True" IsEnabled="False"/>
-            <Button x:Name="chooseFile" Content="选择文件" Width="60" Height="25" Canvas.Left="390" Canvas.Top="150" IsEnabled="False"/>
-            <Button x:Name="sendFile" Content="发送文件" Width="60" Height="25" Canvas.Left="455" Canvas.Top="150" IsEnabled="False"/>
-            <Button x:Name="sendMsg" Content="发送" Width="43" Height="25" Canvas.Left="520" Canvas.Top="150" IsEnabled="False"/>
+            <Button x:Name="chooseFile" Content="选择文件" Width="60" Height="25" Canvas.Left="390" Canvas.Top="150" IsEnabled="False" Click="chooseFile_Click"/>
+            <Button x:Name="sendFile" Content="发送文件" Width="60" Height="25" Canvas.Left="455" Canvas.Top="150" IsEnabled="False" Click="sendFile_Click"/>
+            <Button x:Name="sendMsg" Content="发送" Width="43" Height="25" Canvas.Left="520" Canvas.Top="150" IsEnabled="False" Click="sendMsg_Click"/>
         </Canvas>
     </Grid>
 </Window>

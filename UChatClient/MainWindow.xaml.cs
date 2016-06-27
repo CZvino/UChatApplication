@@ -1,7 +1,10 @@
-﻿using Newtonsoft.Json;
+﻿using Microsoft.Win32;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -60,6 +63,10 @@ namespace UChatClient
         private const byte UPDATE_FRIENDLIST = 30;
         private const byte INIT_FRIENDLIST = 31;
 
+        // 增删好友状态字
+        private const byte ADD_FRIEND = 40;
+        private const byte SUB_FRIEND = 41;
+
         // 在线好友列表状态字
         private const int ADD_ONLINE_FRIEND = 0;
         private const int REMOVE_ONLINE_FRIEND = 1;
@@ -69,7 +76,7 @@ namespace UChatClient
         private const string ipAddr = "127.0.0.1";  //连接ip
         private const int port = 3000;              //连接port
 
-        private bool flagLogin;
+        private bool addFriendFlag, subFriendFlag;
         private UserData userData;
         private string password;
 
@@ -80,6 +87,8 @@ namespace UChatClient
 
         // 用于保存在线的好友列表
         private ObservableCollection<onlineFriendType> onlineFriendlist;
+        private Dictionary<string, List<Paragraph>> dictParagraph = new Dictionary<string, List<Paragraph>>();
+        private Dictionary<string, Thread> dictAnimation = new Dictionary<string, Thread>();
 
         #endregion
 
@@ -90,8 +99,6 @@ namespace UChatClient
         public MainWindow()
         {
             InitializeComponent();
-
-            flagLogin = false;
 
             onlineFriendlist = new ObservableCollection<onlineFriendType>();
             onlineFriendlistListBox.ItemsSource = onlineFriendlist;
@@ -119,6 +126,9 @@ namespace UChatClient
             {
                 MessageBox.Show("服务器连接失败：" + ex.Message);
             }
+
+            List<Paragraph> paragraphList = new List<Paragraph>();
+            dictParagraph.Add("AllUsers", paragraphList);
         }
         #endregion
 
@@ -227,7 +237,7 @@ namespace UChatClient
                     else if (arrMsg[0] == IS_NOT_LOGIN)
                     {
                         //Application.Current.Dispatcher.Invoke(new Action(delegate { AddText(); }));
-                        
+
                         this.hint.Dispatcher.Invoke(new Action(() =>
                         {
                             this.hint.Content = "输入的账号或密码有错误!";
@@ -245,7 +255,7 @@ namespace UChatClient
                     {
                         UserData userdata = (UserData)JsonConvert.DeserializeObject(msgReceive.Substring(1, msgReceive.Length - 1), typeof(UserData));
 
-                        Application.Current.Dispatcher.Invoke(new Action(delegate { RegisterSuccess(userdata);}));
+                        Application.Current.Dispatcher.Invoke(new Action(delegate { RegisterSuccess(userdata); }));
                     }
                     else if (arrMsg[0] == IS_NOT_REGISTER)
                     {
@@ -272,14 +282,21 @@ namespace UChatClient
                                 if (oFT.userData.userId != null && oFT.userData.userId.Equals(friendlistHandler.friendInfo.userId))
                                 {
                                     flag = false;
-                                }      
+                                }
                             }
                             if (flag)
                             {
                                 onlineFriendType newFriend = new onlineFriendType(friendlistHandler.friendInfo);
                                 try
                                 {
-                                    Application.Current.Dispatcher.Invoke(new Action(delegate { onlineFriendlist.Add(newFriend); }));
+                                    Application.Current.Dispatcher.Invoke(new Action(delegate
+                                    {
+                                        // 新增一条在线好友信息
+                                        onlineFriendlist.Add(newFriend);
+                                        // 为新上线的好友分配一个聊天框
+                                        List<Paragraph> paragraph = new List<Paragraph>();
+                                        dictParagraph.Add(newFriend.userData.userId, paragraph);
+                                    }));
                                 }
                                 catch (Exception e)
                                 {
@@ -289,13 +306,30 @@ namespace UChatClient
                         }
                         else if (friendlistHandler.type == REMOVE_ONLINE_FRIEND)
                         {
+
                             foreach (onlineFriendType oFT in onlineFriendlist)
                             {
                                 if (oFT.userData.userId != null && oFT.userData.userId.Equals(friendlistHandler.friendInfo.userId))
                                 {
                                     try
                                     {
-                                        Application.Current.Dispatcher.Invoke(new Action(delegate { onlineFriendlist.Remove(oFT); }));
+                                        Application.Current.Dispatcher.Invoke(new Action(delegate
+                                        {
+                                            onlineFriendType sendTo = (onlineFriendType)onlineFriendlistListBox.SelectedItem;
+                                            if (sendTo.nameAndId.Equals("所有人") == false && sendTo.userData.userId.Equals(oFT.userData.userId))
+                                            {
+                                                onlineFriendlistListBox.SelectedIndex = 0;
+
+                                                chatRichTextBox.Document.Blocks.Clear();
+                                                foreach (Paragraph p in dictParagraph["AllUsers"])
+                                                    chatRichTextBox.Document.Blocks.Add(p);
+                                            }
+
+                                            // 将下线好友的聊天框移除
+                                            dictParagraph.Remove(oFT.userData.userId);
+                                            // 将下线好友从在线好友列表中移除
+                                            onlineFriendlist.Remove(oFT);
+                                        }));
                                         break;
                                     }
                                     catch (Exception e)
@@ -305,6 +339,30 @@ namespace UChatClient
                                 }
                             }
                         }
+                    }
+                    else if (arrMsg[0] == MSG_TO_ALL)
+                    {
+                        MsgHandler msgHandler = (MsgHandler)JsonConvert.DeserializeObject(msgReceive.Substring(1, msgReceive.Length - 1), typeof(MsgHandler));
+
+                        Application.Current.Dispatcher.Invoke(new Action(delegate { ReceiveMsgForAll(msgHandler); }));
+                    }
+                    else if (arrMsg[0] == MSG_TO_INDIVIDULAL)
+                    {
+                        MsgHandler msgHandler = (MsgHandler)JsonConvert.DeserializeObject(msgReceive.Substring(1, msgReceive.Length - 1), typeof(MsgHandler));
+
+                        Application.Current.Dispatcher.Invoke(new Action(delegate { ReceiveMsgForIndividual(msgHandler); }));
+                    }
+                    else if (arrMsg[0] == FILE_TO_ALL)
+                    {
+                        FileHandler msgHandler = (FileHandler)JsonConvert.DeserializeObject(msgReceive.Substring(1, msgReceive.Length - 1), typeof(FileHandler));
+
+                        Application.Current.Dispatcher.Invoke(new Action(delegate { ReceiveFileForAll(msgHandler); }));
+                    }
+                    else if (arrMsg[0] == FILE_TO_INDIVIDUAL)
+                    {
+                        FileHandler msgHandler = (FileHandler)JsonConvert.DeserializeObject(msgReceive.Substring(1, msgReceive.Length - 1), typeof(FileHandler));
+
+                        Application.Current.Dispatcher.Invoke(new Action(delegate { ReceiveFileForIndividual(msgHandler); }));
                     }
                     else
                     {
@@ -331,11 +389,12 @@ namespace UChatClient
         /// </summary>
         private void LoginSuccess()
         {
-            flagLogin = true;
 
             mainWindow.Title = "U信 - " + userData.userName + "(" + userData.userId + ")";
 
             InitFriendList();
+
+            addFriendFlag = subFriendFlag = false;
 
             userLoginCanvas.Visibility = Visibility.Hidden;
             userInfoCanvas.Visibility = Visibility.Visible;
@@ -351,11 +410,20 @@ namespace UChatClient
             chooseFile.IsEnabled = true;
             sendFile.IsEnabled = true;
             sendMsg.IsEnabled = true;
+            addFriend.IsEnabled = true;
+            subFriend.IsEnabled = true;
+            chatRichTextBox.IsEnabled = true;
             onlineFriendlistListBox.IsEnabled = true;
+            onlineFriendlistListBox.SelectedIndex = 0;
+            chatFriendName.Content = "所有人";
 
-            onlineFriendType All = new onlineFriendType("所有人");            
+            chatRichTextBox.Document.Blocks.Clear();
+            foreach (Paragraph p in dictParagraph["AllUsers"])
+                chatRichTextBox.Document.Blocks.Add(p);
+
+            onlineFriendType All = new onlineFriendType("所有人");
             onlineFriendlist.Add(All);
-            
+
         }
         #endregion
 
@@ -421,7 +489,7 @@ namespace UChatClient
             }
             catch (SocketException se)
             {
-               MessageBox.Show("【错误】发送消息异常：" + se.Message);
+                MessageBox.Show("【错误】发送消息异常：" + se.Message);
                 return;
             }
             catch (Exception ex)
@@ -547,7 +615,7 @@ namespace UChatClient
             if (userPasswordRegister.Text.Length > 15)
                 userPasswordRegister.Text = userPasswordRegister.Text.Substring(0, 15);
             userPasswordRegister.Select(userPasswordRegister.Text.Length, 0);
-            
+
             // 用户名
             if (userNameRegister.Text.Length > 15)
                 userNameRegister.Text = userNameRegister.Text.Substring(0, 15);
@@ -622,7 +690,7 @@ namespace UChatClient
                     return;
                 }
             }
-            
+
         }
 
         /// <summary>
@@ -649,7 +717,7 @@ namespace UChatClient
         #region ----------       注册成功       ----------
         private void RegisterSuccess(UserData userdata)
         {
-            MessageBox.Show("注册成功！\r\n您的账号为：" + userdata.userId + "\r\n您的密码为："+ userPasswordRegister.Text);
+            MessageBox.Show("注册成功！\r\n您的账号为：" + userdata.userId + "\r\n您的密码为：" + userPasswordRegister.Text);
             userNameRegister.Text = "";
             userPasswordRegister.Text = "";
             userGenderRegister.Text = "";
@@ -663,6 +731,543 @@ namespace UChatClient
         }
         #endregion
 
+        #region ----------       发送消息       ----------
+        /// <summary>
+        ///     发送消息
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void sendMsg_Click(object sender, RoutedEventArgs e)
+        {
+            onlineFriendType sendTo = (onlineFriendType)onlineFriendlistListBox.SelectedItem;
+
+            byte[] arrMsg, sendArrMsg;
+
+            Paragraph newParagraph = new Paragraph();
+
+            Run run = new Run()
+            {
+                Text = "我  " + System.DateTime.Now.ToString() + "\r\n",
+                Foreground = new SolidColorBrush(Colors.Blue)
+            };
+            newParagraph.Inlines.Add(run);
+
+            InlineUIContainer inlineUIContainer = new InlineUIContainer()
+            {
+
+                Child = new TextBlock()
+                {
+                    Foreground = new SolidColorBrush(Colors.Black),
+                    TextWrapping = TextWrapping.Wrap,
+                    Text = "  " + inputTextBox.Text + "\r\n"
+                }
+            };
+
+            newParagraph.Inlines.Add(inlineUIContainer);
+
+            if (sendTo.nameAndId.Equals("所有人"))
+            {
+                MsgHandler msgHandler = new MsgHandler(userData.userId, userData.userName, "", inputTextBox.Text);
+
+                string sendMsg = JsonConvert.SerializeObject(msgHandler);
+                arrMsg = Encoding.UTF8.GetBytes(sendMsg);
+                sendArrMsg = new byte[arrMsg.Length + 1];
+
+                // 设置标志位，代表更新用户信息
+                sendArrMsg[0] = MSG_TO_ALL;
+                Buffer.BlockCopy(arrMsg, 0, sendArrMsg, 1, arrMsg.Length);
+
+                dictParagraph["AllUsers"].Add(newParagraph);
+                chatRichTextBox.Document.Blocks.Add(newParagraph);
+            }
+            else
+            {
+                MsgHandler msgHandler = new MsgHandler(userData.userId, userData.userName, sendTo.userData.userId, inputTextBox.Text);
+
+                string sendMsg = JsonConvert.SerializeObject(msgHandler);
+
+                arrMsg = Encoding.UTF8.GetBytes(sendMsg);
+                sendArrMsg = new byte[arrMsg.Length + 1];
+
+                // 设置标志位，代表更新用户信息
+                sendArrMsg[0] = MSG_TO_INDIVIDULAL;
+                Buffer.BlockCopy(arrMsg, 0, sendArrMsg, 1, arrMsg.Length);
+
+                dictParagraph[sendTo.userData.userId].Add(newParagraph);
+                chatRichTextBox.Document.Blocks.Add(newParagraph);
+            }
+
+            try
+            {
+                socketClient.Send(sendArrMsg);
+                inputTextBox.Text = "";
+            }
+            catch (SocketException se)
+            {
+                Console.WriteLine("【错误】发送消息异常：" + se.Message);
+                return;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("【错误】发送消息异常：" + ex.Message);
+                return;
+            }
+        }
+        #endregion
+
+        #region ----------     文件发送相关     ----------
+        /// <summary>
+        ///     选择文件
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void chooseFile_Click(object sender, RoutedEventArgs e)
+        {
+            //选择要发送的文件
+            OpenFileDialog ofd = new OpenFileDialog();
+            if (ofd.ShowDialog() == true)
+                fileTextBox.Text = ofd.FileName;
+        }
+
+        /// <summary>
+        ///     发送文件
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void sendFile_Click(object sender, RoutedEventArgs e)
+        {
+            onlineFriendType sendTo = (onlineFriendType)onlineFriendlistListBox.SelectedItem;
+
+            //用文件流打开用户选择的文件
+            try
+            {
+                using (FileStream fs = new FileStream(fileTextBox.Text, FileMode.Open))
+                {
+                    //定义一个4M的数组（缓冲区）
+                    byte[] arrFile = new byte[1024 * 1024 * 2];
+                    //用于发送真实数据的数组
+                    byte[] arrFileSend = new byte[1];
+                    //将文件数据读到数组arrFile中，并获取文件的真实长度
+                    int length = fs.Read(arrFile, 0, arrFile.Length);
+
+                    string fileStream = Encoding.UTF8.GetString(arrFile, 0, length);
+
+                    int indexPoint = fileTextBox.Text.LastIndexOf('.');
+                    int indexLine = fileTextBox.Text.LastIndexOf('\\');
+
+                    string fileName = fileTextBox.Text.Substring(indexLine + 1, indexPoint - indexLine - 1);
+                    string fileType = fileTextBox.Text.Substring(indexPoint + 1, fileTextBox.Text.Length - indexPoint - 1);
+
+                    if (sendTo.nameAndId.Equals("所有人"))
+                    {
+                        FileHandler msgHandler = new FileHandler(userData.userId, userData.userName, fileName, fileType, "", fileStream);
+                        string sendMsg = JsonConvert.SerializeObject(msgHandler);
+                        byte[] arrTmp = Encoding.UTF8.GetBytes(sendMsg);
+                        arrFileSend = new byte[arrTmp.Length + 1];
+                        arrFileSend[0] = FILE_TO_ALL;
+                        Buffer.BlockCopy(arrTmp, 0, arrFileSend, 1, arrTmp.Length);
+                    }
+                    else
+                    {
+                        FileHandler msgHandler = new FileHandler(userData.userId, userData.userName, fileName, fileType, sendTo.userData.userId, fileStream);
+                        string sendMsg = JsonConvert.SerializeObject(msgHandler);
+                        byte[] arrTmp = Encoding.UTF8.GetBytes(sendMsg);
+                        arrFileSend = new byte[arrTmp.Length + 1];
+
+                        arrFileSend[0] = FILE_TO_INDIVIDUAL;
+
+                        Buffer.BlockCopy(arrTmp, 0, arrFileSend, 1, arrTmp.Length);
+                    }
+
+                    try
+                    {
+                        socketClient.Send(arrFileSend);
+                        fileTextBox.Text = "";
+                    }
+                    catch (SocketException se)
+                    {
+                        Console.WriteLine("【错误】发送消息异常：" + se.Message);
+                        return;
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine("【错误】发送消息异常：" + ex.Message);
+                        return;
+                    }
+                }
+            }
+            catch
+            {
+                MessageBox.Show("请选择正确的文件路径！");
+            }
+        }
+        #endregion
+        
+        #region ----------     聊天对象改变     ----------
+        /// <summary>
+        ///     发送消息的好友变了就改变聊天界面
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void onlineFriendlistListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            onlineFriendType sendTo = (onlineFriendType)onlineFriendlistListBox.SelectedItem;
+            chatFriendName.Content = sendTo.nameAndId;
+
+            chatRichTextBox.Document.Blocks.Clear();
+            if (sendTo.nameAndId.Equals("所有人"))
+            {
+                foreach (Paragraph p in dictParagraph["AllUsers"])
+                    chatRichTextBox.Document.Blocks.Add(p);
+            }
+            else
+            {
+                foreach (Paragraph p in dictParagraph[sendTo.userData.userId])
+                    chatRichTextBox.Document.Blocks.Add(p);
+            }
+        }
+        #endregion
+
+        #region ----------接收群发给所有人的消息----------
+        /// <summary>
+        ///     接收到群发给所有人的消息
+        /// </summary>
+        /// <param name="msgHandler"></param>
+        private void ReceiveMsgForAll(MsgHandler msgHandler)
+        {
+            List<Paragraph> userParagraphList = dictParagraph["AllUsers"];
+
+            
+
+            Paragraph newParagraph = new Paragraph();
+
+            Run run = new Run()
+            {
+                Text = msgHandler.fromName + "(" + msgHandler.from + ")" + "  " + System.DateTime.Now.ToString() + "\r\n",
+                Foreground = new SolidColorBrush(Colors.Red)
+            };
+            newParagraph.Inlines.Add(run);
+
+            InlineUIContainer inlineUIContainer = new InlineUIContainer()
+            {
+
+                Child = new TextBlock()
+                {
+                    Foreground = new SolidColorBrush(Colors.Black),
+                    TextWrapping = TextWrapping.Wrap,
+                    Text = "  " + msgHandler.message + "\r\n"
+                }
+            };
+
+            newParagraph.Inlines.Add(inlineUIContainer);
+
+            userParagraphList.Add(newParagraph);
+
+            onlineFriendType sendTo = (onlineFriendType)onlineFriendlistListBox.SelectedItem;
+
+
+            if (sendTo.nameAndId.Equals("所有人"))
+                chatRichTextBox.Document.Blocks.Add(newParagraph);
+            else
+            {
+                onlineFriendType allUsers = (onlineFriendType)onlineFriendlistListBox.Items[0];
+                allUsers.increaseNum();
+            }
+        }
+        #endregion
+
+        #region ----------接收发送个特定人的消息----------
+        /// <summary>
+        ///     接收到群发给所有人的消息
+        /// </summary>
+        /// <param name="msgHandler"></param>
+        private void ReceiveMsgForIndividual(MsgHandler msgHandler)
+        {
+            List<Paragraph> userParagraphList = dictParagraph[msgHandler.from];
+
+            Paragraph newParagraph = new Paragraph();
+
+
+            Run run = new Run()
+            {
+                Text = msgHandler.fromName + "  " + System.DateTime.Now.ToString() + "\r\n",
+                Foreground = new SolidColorBrush(Colors.Red)
+            };
+            newParagraph.Inlines.Add(run);
+
+            InlineUIContainer inlineUIContainer = new InlineUIContainer()
+            {
+
+                Child = new TextBlock()
+                {
+                    Foreground = new SolidColorBrush(Colors.Black),
+                    TextWrapping = TextWrapping.Wrap,
+                    Text = "  " + msgHandler.message + "\r\n"
+                }
+            };
+
+            newParagraph.Inlines.Add(inlineUIContainer);
+
+            userParagraphList.Add(newParagraph);
+
+            onlineFriendType sendTo = (onlineFriendType)onlineFriendlistListBox.SelectedItem;
+
+
+            if (sendTo.nameAndId.Equals("所有人") == false && sendTo.userData.userId.Equals(msgHandler.from))
+                chatRichTextBox.Document.Blocks.Add(newParagraph);
+            else
+            {
+                int index;
+                if (FindItemByUserId(msgHandler.from, out index))
+                {
+                    onlineFriendType user = (onlineFriendType)onlineFriendlistListBox.Items[index];
+                    user.increaseNum();
+                }
+            }
+        }
+        #endregion
+
+        #region ----------接受群发给所有人的文件----------
+        /// <summary>
+        ///     接受发送给所有人的文件
+        /// </summary>
+        /// <param name="msgHandler"></param>
+        private void ReceiveFileForAll(FileHandler msgHandler)
+        {
+            byte[] fileStream = Encoding.UTF8.GetBytes(msgHandler.message);
+            //保存文件对话框对象
+            SaveFileDialog sfd = new SaveFileDialog();
+            sfd.DefaultExt = msgHandler.fileType;
+            if (msgHandler.fileType.Equals("txt"))
+                sfd.Filter = "文本文件(*.txt)|*.txt";
+            else if (msgHandler.fileType.Equals("doc"))
+                sfd.Filter = "word文档(*.doc)|*.doc";
+            else if (msgHandler.fileType.Equals("docx"))
+                sfd.Filter = "word文档(*.docx)|*.docx";
+            else if (msgHandler.fileType.Equals("cpp"))
+                sfd.Filter = "c++文件(*.cpp)|*.cpp";
+            else if (msgHandler.fileType.Equals("c"))
+                sfd.Filter = "c文件(*.c)|*.c";
+            else if (msgHandler.fileType.Equals("h"))
+                sfd.Filter = "头文件(*.h)|*.h";
+            else if (msgHandler.fileType.Equals("ppt"))
+                sfd.Filter = "PowerPoint文件(*.ppt)|*.ppt";
+            else if (msgHandler.fileType.Equals("pptx"))
+                sfd.Filter = "PowerPoint文件(*.pptx)|*.pptx";
+            else if (msgHandler.fileType.Equals("pdf"))
+                sfd.Filter = "PDF文档(*.pdf)|*.pdf";
+            else if (msgHandler.fileType.Equals("xls"))
+                sfd.Filter = "excel文档(*.xls)|*.xls";
+            if (sfd.Filter == null || sfd.Filter.Equals(""))
+                sfd.Filter += "All FIles(*.*)|*.*";
+            else
+                sfd.Filter += "| All FIles(*.*)|*.*";
+
+            List<Paragraph> userParagraphList = dictParagraph["AllUsers"];
+
+            Paragraph newParagraph = new Paragraph();
+
+            Run run = new Run()
+            {
+                Text = System.DateTime.Now.ToString() + " 收到来自" + msgHandler.fromName + "(" + msgHandler.from + ")" + " 的文件\r\n",
+                Foreground = new SolidColorBrush(Colors.SteelBlue)
+            };
+            newParagraph.Inlines.Add(run);
+
+            userParagraphList.Add(newParagraph);
+
+            onlineFriendType sendTo = (onlineFriendType)onlineFriendlistListBox.SelectedItem;
+
+            sfd.FileName = msgHandler.fileName + "." + msgHandler.fileType;
+            if (sfd.ShowDialog(this) == true)
+            {
+                //获取文件将要保存的路径
+                string fileSavePath = sfd.FileName;
+                //创建文件流，让文件流根据路径创建一个文件
+                using (FileStream fs = new FileStream(fileSavePath, FileMode.Create))
+                {
+                    Run mrun = new Run()
+                    {
+                        Text = "文件保存到"+fileSavePath+"\r\n",
+                        Foreground = new SolidColorBrush(Colors.SteelBlue)
+                    };
+                    newParagraph.Inlines.Add(mrun);
+                    fs.Write(fileStream, 1, fileStream.Length - 1);
+                }
+            }
+
+            if (sendTo.nameAndId.Equals("所有人"))
+                chatRichTextBox.Document.Blocks.Add(newParagraph);
+            else
+            {
+                onlineFriendType allUsers = (onlineFriendType)onlineFriendlistListBox.Items[0];
+                allUsers.increaseNum();
+            }
+        }
+        #endregion
+
+        #region ----------接收发送给特定人的文件----------
+        /// <summary>
+        ///     接受发送给特定人的文件
+        /// </summary>
+        /// <param name="msgHandler"></param>
+        private void ReceiveFileForIndividual(FileHandler msgHandler)
+        {
+            byte[] fileStream = Encoding.UTF8.GetBytes(msgHandler.message);
+            //保存文件对话框对象
+            SaveFileDialog sfd = new SaveFileDialog();
+            sfd.DefaultExt = msgHandler.fileType;
+            if (msgHandler.fileType.Equals("txt"))
+                sfd.Filter = "文本文件(*.txt)|*.txt";
+            else if (msgHandler.fileType.Equals("doc"))
+                sfd.Filter = "word文档(*.doc)|*.doc";
+            else if (msgHandler.fileType.Equals("docx"))
+                sfd.Filter = "word文档(*.docx)|*.docx";
+            else if (msgHandler.fileType.Equals("cpp"))
+                sfd.Filter = "c++文件(*.cpp)|*.cpp";
+            else if (msgHandler.fileType.Equals("c"))
+                sfd.Filter = "c文件(*.c)|*.c";
+            else if (msgHandler.fileType.Equals("h"))
+                sfd.Filter = "头文件(*.h)|*.h";
+            else if (msgHandler.fileType.Equals("ppt"))
+                sfd.Filter = "PowerPoint文件(*.ppt)|*.ppt";
+            else if (msgHandler.fileType.Equals("pptx"))
+                sfd.Filter = "PowerPoint文件(*.pptx)|*.pptx";
+            else if (msgHandler.fileType.Equals("pdf"))
+                sfd.Filter = "PDF文档(*.pdf)|*.pdf";
+            else if (msgHandler.fileType.Equals("xls"))
+                sfd.Filter = "excel文档(*.xls)|*.xls";
+            if (sfd.Filter == null || sfd.Filter.Equals(""))
+                sfd.Filter += "All FIles(*.*)|*.*";
+            else
+                sfd.Filter += "| All FIles(*.*)|*.*";
+
+            List<Paragraph> userParagraphList = dictParagraph[msgHandler.from];
+
+            Paragraph newParagraph = new Paragraph();
+
+            Run run = new Run()
+            {
+                Text = System.DateTime.Now.ToString() + " 收到来自" + msgHandler.fromName + "(" + msgHandler.from + ")" + " 的文件\r\n",
+                Foreground = new SolidColorBrush(Colors.SteelBlue)
+            };
+            newParagraph.Inlines.Add(run);
+
+            userParagraphList.Add(newParagraph);
+
+            onlineFriendType sendTo = (onlineFriendType)onlineFriendlistListBox.SelectedItem;
+
+            sfd.FileName = msgHandler.fileName + "." + msgHandler.fileType;
+            if (sfd.ShowDialog(this) == true)
+            {
+                //获取文件将要保存的路径
+                string fileSavePath = sfd.FileName;
+                //创建文件流，让文件流根据路径创建一个文件
+                using (FileStream fs = new FileStream(fileSavePath, FileMode.Create))
+                {
+                    Run mrun = new Run()
+                    {
+                        Text = "文件保存到" + fileSavePath + "\r\n",
+                        Foreground = new SolidColorBrush(Colors.SteelBlue)
+                    };
+                    newParagraph.Inlines.Add(mrun);
+                    fs.Write(fileStream, 1, fileStream.Length - 1);
+                }
+            }
+
+            if (sendTo.nameAndId.Equals("所有人") == false && sendTo.userData.userId.Equals(msgHandler.from))
+            {
+                chatRichTextBox.Document.Blocks.Add(newParagraph);
+            }               
+            else
+            {
+                int index;
+                if (FindItemByUserId(msgHandler.from, out index))
+                {
+                    onlineFriendType user = (onlineFriendType)onlineFriendlistListBox.Items[index];
+                    user.increaseNum();
+                }
+            }
+        }
+        #endregion
+
+        #region ---------- 从listbox中找到特定的在线好友 ----------
+        /// <summary>
+        ///     从listbox中找到相应userId的项
+        /// </summary>
+        /// <param name="userId"></param>
+        /// <param name="ans"></param>
+        /// <returns></returns>
+        private bool FindItemByUserId(string userId, out int index)
+        {
+            index = 0;
+            foreach (object obj in onlineFriendlistListBox.Items)
+            {
+                onlineFriendType tmp = (onlineFriendType)obj;
+                if (tmp.nameAndId.Equals("所有人") == false && tmp.userData.userId.Equals(userId))
+                {
+                    index = onlineFriendlistListBox.Items.IndexOf(obj);
+                    return true;
+                }
+                    
+            }
+            return false;
+        }
+        #endregion
+
+        #region ----------     增删好友相关     ----------
+        /// <summary>
+        ///     增加好友
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void subFriend_Click(object sender, RoutedEventArgs e)
+        {
+            addFriendFlag = false;
+            subFriendFlag = true;
+            confirmFriend.IsEnabled = true;
+            friendTextBox.IsEnabled = true;
+        }
+
+        /// <summary>
+        ///     删除好友
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void addFriend_Click(object sender, RoutedEventArgs e)
+        {
+            addFriendFlag = true;
+            subFriendFlag = false;
+            confirmFriend.IsEnabled = true;
+            friendTextBox.IsEnabled = true;
+        }
+
+        private void confirmFriend_Click(object sender, RoutedEventArgs e)
+        {
+            string userId = friendTextBox.Text;
+            if (userId == null || userId.Equals(""))
+                MessageBox.Show("请输入正确的账号！");
+            else
+            {
+                byte[] arrMsg = Encoding.UTF8.GetBytes(userId);
+                byte[] sendArrMsg = new byte[arrMsg.Length + 1];
+                if (addFriendFlag && !subFriendFlag)
+                    sendArrMsg[0] = ADD_FRIEND;
+                else if (!addFriendFlag && subFriendFlag)
+                    sendArrMsg[0] = SUB_FRIEND;
+                else
+                {
+                    MessageBox.Show("出错！");
+                    return;
+                }
+                socketClient.Send(sendArrMsg);
+            }
+
+            addFriendFlag = subFriendFlag = false;
+            friendTextBox.Text = "";
+            friendTextBox.IsEnabled = false;
+        }
+        #endregion
     }
 
     #region ----------  显示好友列表的信息  ----------
@@ -675,6 +1280,11 @@ namespace UChatClient
         public int msgNum { get; set; }
         public string msgNumString { get; set; }
         public UserData userData;
+
+        public onlineFriendType()
+        {
+
+        }
 
         public onlineFriendType(UserData ud)
         {
@@ -759,12 +1369,31 @@ namespace UChatClient
     public struct MsgHandler
     {
         public string from;
+        public string fromName;
         public string to;
         public string message;
 
-        public MsgHandler(string f, string t, string m)
+        public MsgHandler(string f, string fn, string t, string m)
         {
-            from = f; to = t; message = m;
+            from = f; fromName = fn; to = t; message = m;
+        }
+    };
+
+    /// <summary>
+    ///     用于JSON解析文件通信的结构体
+    /// </summary>
+    public struct FileHandler
+    {
+        public string from;
+        public string fromName;
+        public string to;
+        public string fileName;
+        public string fileType;
+        public string message;
+
+        public FileHandler(string f, string fn, string fiN, string ft, string t, string m)
+        {
+            from = f; fromName = fn; fileName = fiN; fileType = ft; to = t; message = m;
         }
     };
 

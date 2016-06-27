@@ -43,6 +43,10 @@ namespace UChatServer
         private const byte UPDATE_FRIENDLIST = 30;
         private const byte INIT_FRIENDLIST = 31;
 
+        // 增删好友状态字
+        private const byte ADD_FRIEND = 40;
+        private const byte SUB_FRIEND = 41;
+
         // 在线好友列表状态字
         private const int ADD_ONLINE_FRIEND = 0;
         private const int REMOVE_ONLINE_FRIEND = 1;
@@ -463,18 +467,38 @@ namespace UChatServer
         /// <param name="Msg">要发送的消息</param>
         private void SendMsgToIndividual(string Msg)
         {
-            // 定义一个消息解析对象，用于查找发送个体
-            string str = Msg.Substring(1, Msg.Length - 1);
-            MsgHandler msgHandler = (MsgHandler)JsonConvert.DeserializeObject(str, typeof(MsgHandler));
+            // 用UTF8解码成字节数组
+            byte[] strMsg = Encoding.UTF8.GetBytes(Msg);
 
+            string targetIp = "";
+
+            // 定义一个消息解析对象，用于查找发送个体
             // 找到目标IP
-            string targetIp;
-            if (msgHandler.to != null && dictOnlineUserO.ContainsKey(msgHandler.to))
-                targetIp = dictOnlineUserO[msgHandler.to];
-            else
+            string str = Msg.Substring(1, Msg.Length - 1);
+            if (strMsg[0] == MSG_TO_INDIVIDULAL)
             {
-                Console.WriteLine("【错误】【非法消息】此消息不含接收端信息！");
-                return;
+                MsgHandler msgHandler = (MsgHandler)JsonConvert.DeserializeObject(str, typeof(MsgHandler));
+
+                if (msgHandler.to != null && dictOnlineUserO.ContainsKey(msgHandler.to))
+                    targetIp = dictOnlineUserO[msgHandler.to];
+                else
+                {
+                    Console.WriteLine("【错误】【非法消息】此消息不含接收端信息！");
+                    return;
+                }
+            }
+            else if (strMsg[0] == FILE_TO_INDIVIDUAL)
+            {
+                FileHandler msgHandler = (FileHandler)JsonConvert.DeserializeObject(str, typeof(FileHandler));
+
+                if (msgHandler.to != null && dictOnlineUserO.ContainsKey(msgHandler.to))
+                    targetIp = dictOnlineUserO[msgHandler.to];
+                else
+                {
+                    Console.WriteLine("【错误】【非法消息】此消息不含接收端信息！");
+                    return;
+                }
+
             }
 
             //若目标IP不在在线队列中
@@ -515,18 +539,32 @@ namespace UChatServer
             // 用UTF8解码成字节数组
             byte[] strMsg = Encoding.UTF8.GetBytes(Msg);
 
-            // 解析字符串，在发送时不向发送者发送消息
-            MsgHandler msgHandler = (MsgHandler)JsonConvert.DeserializeObject(Msg.Substring(1, Msg.Length - 1), typeof(MsgHandler));
+            string senderIp = "";
 
+            // 解析字符串，在发送时不向发送者发送消息
             // 获取发送者的Ip信息
-            string senderIp;
-            if (msgHandler.from != null)
-                senderIp = dictOnlineUserO[msgHandler.from];
-            else    // 消息不包含发送者信息报错 
+            if (strMsg[0] == MSG_TO_ALL)
             {
-                Console.WriteLine("【错误】【非法消息】消息 \"" + Msg.Substring(1, Msg.Length - 1) + "\" 不包含发送者信息！");
-                return;
+                MsgHandler msgHandler = (MsgHandler)JsonConvert.DeserializeObject(Msg.Substring(1, Msg.Length - 1), typeof(MsgHandler));
+                if (msgHandler.from != null)
+                    senderIp = dictOnlineUserO[msgHandler.from];
+                else    // 消息不包含发送者信息报错 
+                {
+                    Console.WriteLine("【错误】【非法消息】消息 \"" + Msg.Substring(1, Msg.Length - 1) + "\" 不包含发送者信息！");
+                    return;
+                }
             }
+            else if (strMsg[0] == FILE_TO_ALL)
+            {
+                FileHandler msgHandler = (FileHandler)JsonConvert.DeserializeObject(Msg.Substring(1, Msg.Length - 1), typeof(FileHandler));
+                if (msgHandler.from != null)
+                    senderIp = dictOnlineUserO[msgHandler.from];
+                else    // 消息不包含发送者信息报错 
+                {
+                    Console.WriteLine("【错误】【非法消息】消息 \"" + Msg.Substring(1, Msg.Length - 1) + "\" 不包含发送者信息！");
+                    return;
+                }
+            }                      
 
             // 若不包含发送者的Socket报错
             if (senderIp == null || senderIp == "")
@@ -716,12 +754,31 @@ namespace UChatServer
     public struct MsgHandler
     {
         public string from;
+        public string fromName;
         public string to;
         public string message;
 
-        public MsgHandler(string f, string t, string m)
+        public MsgHandler(string f, string fn, string t, string m)
         {
-            from = f; to = t; message = m;
+            from = f; fromName = fn; to = t; message = m;
+        }
+    };
+
+    /// <summary>
+    ///     用于JSON解析文件通信的结构体
+    /// </summary>
+    public struct FileHandler
+    {
+        public string from;
+        public string fromName;
+        public string to;
+        public string fileName;
+        public string fileType;
+        public string message;
+
+        public FileHandler(string f, string fn, string fiN, string ft, string t, string m)
+        {
+            from = f; fromName = fn; fileName = fiN; fileType = ft; to = t; message = m;
         }
     };
 

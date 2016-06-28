@@ -52,7 +52,6 @@
             <Button x:Name="editInfo" Width="50" Height="20" Content="编辑" VerticalContentAlignment="Center" HorizontalContentAlignment="Center" Canvas.Left="75" Canvas.Top="130" Click="editInfo_Click"/>
         </Canvas>
         <Canvas x:Name="userLoginCanvas" Margin="5,5,580,400" Visibility="Visible">
-
             <Label x:Name="hint" Content="{Binding ElementName=hintText,Path=Content}" FontSize="10" Foreground="Red" Height="25" Width="150" Canvas.Left="25" Canvas.Top="10"  HorizontalContentAlignment="Center" VerticalContentAlignment="Center" />
 
             <Label x:Name="accountLabel" Content="账号" Height="25" Width="40" Canvas.Left="20" Canvas.Top="35" HorizontalAlignment="Center"/>

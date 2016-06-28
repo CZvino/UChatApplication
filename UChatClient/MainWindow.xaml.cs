@@ -21,6 +21,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using System.Runtime.InteropServices;
 
 namespace UChatClient
 {
@@ -31,6 +32,13 @@ namespace UChatClient
     {
 
         #region ----------      定义变量      ----------
+
+        // 引用系统钩子
+        [DllImport("user32.dll")]
+        public static extern IntPtr GetActiveWindow();
+
+        [DllImport("user32.dll")]
+        public static extern IntPtr SetActiveWindow(IntPtr hwnd);
 
         #region ----------     定义状态字     ----------
         // 登录/注册 相关
@@ -75,6 +83,8 @@ namespace UChatClient
 
         #endregion
 
+        private int cnt;
+
         private const string ipAddr = "127.0.0.1";  //连接ip
         private const int port = 3000;              //连接port
 
@@ -101,6 +111,8 @@ namespace UChatClient
         public MainWindow()
         {
             InitializeComponent();
+
+            cnt = 0;
 
             onlineFriendlist = new ObservableCollection<onlineFriendType>();
             onlineFriendlistListBox.ItemsSource = onlineFriendlist;
@@ -205,7 +217,7 @@ namespace UChatClient
         }
         #endregion
 
-        #region ----------     接收消息     ----------
+        #region ----------     接收消息      ----------
         /// <summary>
         ///     接收消息
         /// </summary>
@@ -319,6 +331,12 @@ namespace UChatClient
                                         // 为新上线的好友分配一个聊天框
                                         List<Paragraph> paragraph = new List<Paragraph>();
                                         dictParagraph.Add(newFriend.userData.userId, paragraph);
+
+                                        IntPtr activeForm = GetActiveWindow(); // 先得到当前的活动窗体          
+                                        Prompt test = new Prompt(newFriend.userData.userName+"("+newFriend.userData.userId+")"+" 已上线", 0);
+                                        cnt = (cnt + 1) % 6;
+                                        test.Show();
+                                        SetActiveWindow(activeForm); // 在把焦点还给之前的活动窗体
                                     }));
                                 }
                                 catch (Exception e)
@@ -348,10 +366,17 @@ namespace UChatClient
                                                     chatRichTextBox.Document.Blocks.Add(p);
                                             }
 
+                                            IntPtr activeForm = GetActiveWindow(); // 先得到当前的活动窗体          
+                                            Prompt test = new Prompt(oFT.userData.userName + "(" + oFT.userData.userId + ")" + " 已下线", 0);
+                                            cnt = (cnt + 1) % 6;
+                                            test.Show();
+                                            SetActiveWindow(activeForm); // 在把焦点还给之前的活动窗体
+
                                             // 将下线好友的聊天框移除
                                             dictParagraph.Remove(oFT.userData.userId);
                                             // 将下线好友从在线好友列表中移除
                                             onlineFriendlist.Remove(oFT);
+                                            
                                         }));
                                         break;
                                     }
@@ -394,12 +419,12 @@ namespace UChatClient
                 }
                 catch (SocketException se)
                 {
-                    MessageBox.Show("【错误】接收消息异常：" + se.Message);
+                    //MessageBox.Show("【错误】接收消息异常：" + se.Message);
                     return;
                 }
                 catch (Exception e)
                 {
-                    MessageBox.Show("【错误】接收消息异常：" + e.Message);
+                    //MessageBox.Show("【错误】接收消息异常：" + e.Message);
                     return;
                 }
             }
@@ -505,7 +530,7 @@ namespace UChatClient
             // 向服务器发送断开连接申请
             byte[] sendArrMsg = new byte[1];
             sendArrMsg[0] = DISCONNECT;
-
+            
             try
             {
                 socketClient.Send(sendArrMsg);
@@ -902,6 +927,26 @@ namespace UChatClient
                         Buffer.BlockCopy(arrTmp, 0, arrFileSend, 1, arrTmp.Length);
                     }
 
+                    List<Paragraph> userParagraphList;
+
+                    if (sendTo.nameAndId.Equals("所有人"))
+                        userParagraphList = dictParagraph["AllUsers"];
+                    else
+                        userParagraphList = dictParagraph[sendTo.userData.userId];
+
+                    Paragraph newParagraph = new Paragraph();
+
+                    Run run = new Run()
+                    {
+                        Text = System.DateTime.Now.ToString() + " 发送文件" + fileName + "." + fileType + "\r\n",
+                        Foreground = new SolidColorBrush(Colors.SteelBlue)
+                    };
+                    newParagraph.Inlines.Add(run);
+
+                    userParagraphList.Add(newParagraph);
+
+                    chatRichTextBox.Document.Blocks.Add(newParagraph);
+                    
                     try
                     {
                         socketClient.Send(arrFileSend);
@@ -923,6 +968,7 @@ namespace UChatClient
             {
                 MessageBox.Show("请选择正确的文件路径！");
             }
+
         }
         #endregion
         
@@ -995,6 +1041,11 @@ namespace UChatClient
             {
                 onlineFriendType allUsers = (onlineFriendType)onlineFriendlistListBox.Items[0];
                 allUsers.increaseNum();
+                IntPtr activeForm = GetActiveWindow(); // 先得到当前的活动窗体          
+                Prompt test = new Prompt("来自 所有人 的新消息", 0);
+                cnt = (cnt + 1) % 6;
+                test.Show();
+                SetActiveWindow(activeForm); // 在把焦点还给之前的活动窗体
             }
         }
         #endregion
@@ -1045,6 +1096,11 @@ namespace UChatClient
                 {
                     onlineFriendType user = (onlineFriendType)onlineFriendlistListBox.Items[index];
                     user.increaseNum();
+                    IntPtr activeForm = GetActiveWindow(); // 先得到当前的活动窗体          
+                    Prompt test = new Prompt("来自 " + msgHandler.fromName + "(" + msgHandler.from + ") 的新消息", 0);
+                    cnt = (cnt + 1) % 6;
+                    test.Show();
+                    SetActiveWindow(activeForm); // 在把焦点还给之前的活动窗体
                 }
             }
         }
@@ -1274,7 +1330,13 @@ namespace UChatClient
         {
             string userId = friendTextBox.Text.Trim();
             if (userId == null || userId.Equals(""))
+            {
                 MessageBox.Show("请输入正确的账号！");
+                addFriendFlag = subFriendFlag = false;
+                friendTextBox.Text = "";
+                friendTextBox.IsEnabled = false;
+                confirmFriend.IsEnabled = false;
+            }             
             else
             {
                 byte[] arrMsg = Encoding.UTF8.GetBytes(userId);
@@ -1286,6 +1348,9 @@ namespace UChatClient
                 else
                 {
                     MessageBox.Show("出错！");
+                    friendTextBox.Text = "";
+                    friendTextBox.IsEnabled = false;
+                    confirmFriend.IsEnabled = false;
                     return;
                 }
                 Buffer.BlockCopy(arrMsg, 0, sendArrMsg, 1, arrMsg.Length);
